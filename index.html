@@ -444,7 +444,11 @@ function tToday(){
   const grading=ASSIGN.map(a=>({a,n:waitingOf(a)})).filter(x=>x.n).sort((x,y)=>x.a.due.localeCompare(y.a.due));
   const late=[];ASSIGN.forEach(a=>Object.entries(RESULTS[a.id]||{}).forEach(([sid,r])=>{if(r.status==='todo'&&a.type==='숙제평가'&&a.due<TODAY&&stu(+sid))late.push({a,s:stu(+sid)})}));
   const miss=missingFeedback();
-  return `<div class="head" style="display:flex;justify-content:space-between;align-items:flex-end;gap:8px"><div><div class="sub">${mdw(TODAY)} · ${esc(TEACHER.name)}</div><h1>오늘 할 일</h1></div><button class="btn sm ghost" data-logout="1">로그아웃</button></div>${installCard()}
+  return `<div class="head" style="display:flex;justify-content:space-between;align-items:flex-end;gap:8px"><div><div class="sub">${mdw(TODAY)} · ${esc(TEACHER.name)}</div><h1>오늘 할 일</h1></div><div class="acts"><button class="btn sm ghost" data-pwopen="1">비밀번호</button><button class="btn sm ghost" data-logout="1">로그아웃</button></div></div>${pwOpen?`<form id="pwForm" class="card form private">
+    <div class="full"><b>선생님 비밀번호 바꾸기</b></div>
+    <label class="full">새 비밀번호 (8자 이상)<input name="pw" type="password" autocomplete="new-password" minlength="8" required></label>
+    <label class="full">새 비밀번호 확인<input name="pw2" type="password" autocomplete="new-password" minlength="8" required></label>
+    <button class="btn">바꾸기</button><button type="button" class="btn ghost" data-pwopen="0">닫기</button></form>`:''}${installCard()}
   <section class="card"><div class="stats">
     <div class="stat"><b>${occ.length}</b><span>오늘 수업</span></div>
     <div class="stat"><b>${grading.reduce((s,x)=>s+x.n,0)}</b><span>채점 대기</span></div>
@@ -693,6 +697,7 @@ const DB=window.__FAKE_DB__||{
   async setSession(s){const {error}=await this.sb.auth.setSession(s);if(error)throw error},
   async signInEmail(email,password){const {error}=await this.sb.auth.signInWithPassword({email,password});if(error)throw error},
   async signOut(){await this.sb.auth.signOut()},
+  async updatePassword(pw){const {error}=await this.sb.auth.updateUser({password:pw});if(error)throw error},
   async myProfile(){const {data:{user}}=await this.sb.auth.getUser();if(!user)return null;const {data}=await this.sb.from('profiles').select('*').eq('id',user.id).single();return data}
 };
 // 화면 코드는 학생을 작은 번호로 다루고, 저장할 때 실제 id(uuid)로 바꿔요
@@ -729,7 +734,7 @@ async function save(fn,msg){
 // ===================== 로그인 =====================
 // 학생: 선생님이 준 전용 링크(#t=…)로 열고, 처음 한 번만 번호 네 자리
 // 선생님: 주소 끝에 #teacher
-let needsSetup=false, loginErr='', lockedUntil=0, busy=false, lockTimer=null, pinNotice=null;
+let pwOpen=false, needsSetup=false, loginErr='', lockedUntil=0, busy=false, lockTimer=null, pinNotice=null;
 let gate='none', linkToken=null, linkName='', linkBad='';
 const LINK_KEY='borine-link';
 function readRoute(){
@@ -835,6 +840,9 @@ document.addEventListener('submit',async e=>{
     try{const r=await DB.api('setup',{name:g('name'),email:g('email'),password:String(fd.get('password'))});needsSetup=false;
       if(r.session)await DB.setSession(r.session);else await DB.signInEmail(g('email'),String(fd.get('password')));await enter()}
     catch(er){busy=false;loginErr=er.message;render()}return}
+  if(f.id==='pwForm'){const a=String(fd.get('pw')||''),b2=String(fd.get('pw2')||'');
+    if(a.length<8){toast('8자 이상으로 해 주세요');return}if(a!==b2){toast('비밀번호 확인이 맞지 않아요');return}
+    try{await DB.updatePassword(a);pwOpen=false;render();toast('비밀번호를 바꿨어요')}catch(er){toast('바꾸지 못했어요: '+er.message)}return}
   if(f.id==='teacherLogin'){busy=true;loginErr='';render();
     try{await DB.signInEmail(g('email'),String(fd.get('password')||''));await enter()}catch(er){busy=false;loginErr='이메일 또는 비밀번호가 맞지 않아요.';render()}return}
   if(f.id==='stuForm'){
@@ -906,6 +914,7 @@ document.addEventListener('click',async e=>{
   if(d.schoolof){schoolSid=+d.schoolof;stuDetail=null;goT('school');return}
   if(d.preview){preview=true;sLesson=null;curSid=+d.preview;load(curSid);tab=d.pg==='school'?'grades':'home';if(d.pg==='school')gTab='school';render();window.scrollTo(0,0);return}
   if(d.endpreview){preview=false;sLesson=null;render();window.scrollTo(0,0);return}
+  if(d.pwopen){pwOpen=d.pwopen==='1';render();return}
   if(d.install){if(installEvt){installEvt.prompt();const r=await installEvt.userChoice.catch(()=>null);installEvt=null;if(r?.outcome==='accepted')toast('설치했어요')}render();return}
   if(d.installhide){try{localStorage.setItem('borine-install-hide','1')}catch(er){}render();return}
   if(d.copylink){const u=linkUrl(+d.copylink);try{await navigator.clipboard.writeText(u);toast('링크를 복사했어요')}catch(er){toast('복사가 안 돼요. 링크를 길게 눌러 복사해 주세요')}return}
