@@ -1045,7 +1045,7 @@ function installCard(){
 }
 
 // ===================== 시작 =====================
-if('serviceWorker' in navigator)navigator.serviceWorker.register('./sw.js').catch(()=>{});
+if('serviceWorker' in navigator)navigator.serviceWorker.register('./sw.js',{updateViaCache:'none'}).then(r=>r.update()).catch(()=>{});
 addEventListener('hashchange',()=>location.reload());
 (async()=>{
   view.innerHTML='<div class="empty" style="padding-top:30vh">불러오는 중…</div>';bar.hidden=true;

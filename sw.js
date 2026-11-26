@@ -1,7 +1,9 @@
-// 앱 설치용 최소 서비스 워커: 항상 최신 화면을 네트워크에서 가져와요 (저장해 두지 않음)
+// 앱 설치용 서비스 워커: 화면 파일은 항상 서버에 새 버전이 있는지 확인하고 가져와요
+const V = '2';
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()));
 self.addEventListener('fetch', (e) => {
-  if (e.request.method !== 'GET' || new URL(e.request.url).origin !== location.origin) return;
-  e.respondWith(fetch(e.request));
+  const u = new URL(e.request.url);
+  if (e.request.method !== 'GET' || u.origin !== location.origin) return;
+  e.respondWith(fetch(e.request, { cache: 'no-cache' }).catch(() => fetch(e.request)));
 });
