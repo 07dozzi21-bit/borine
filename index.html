@@ -137,6 +137,17 @@ tr.hl td{background:color-mix(in srgb,var(--en) 18%,transparent)}
 .rchips span{display:inline-flex;align-items:center;min-height:40px;padding:0 14px;border:1px solid var(--line);border-radius:99px;background:var(--card);color:var(--ink);font-size:15px;font-weight:700}
 .rchips input:checked+span{background:var(--deep);border-color:var(--deep);color:var(--onbtn)}
 .rchips input:focus-visible+span{outline:3px solid var(--en);outline-offset:2px}
+.slots{border-collapse:separate;border-spacing:2px;width:100%;min-width:290px;table-layout:fixed}
+.slots th{font-size:11px;color:var(--mute);font-weight:700;padding:2px;text-align:center;border:0;white-space:nowrap}
+.slots th:first-child{width:32px}.slots th.sat{width:34px;border-left:2px solid var(--line)}
+.slots td{padding:0;border:0;height:40px}
+.sc{width:100%;height:40px;border:1px solid var(--line);border-radius:8px;background:var(--soft);color:var(--ink);cursor:pointer;padding:1px;display:grid;place-content:center;line-height:1.1;overflow:hidden}
+.sc b{font-size:12px}.sc small{font-size:9px;color:var(--mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.sc.영어{background:color-mix(in srgb,var(--en) 45%,var(--card));border-color:var(--en)}
+.sc.수학{background:color-mix(in srgb,var(--ma) 35%,var(--card));border-color:var(--ma)}
+td.sc{display:table-cell;cursor:default;vertical-align:middle;text-align:center;font-size:10px;height:auto;min-height:40px;padding:3px 1px}
+td.sc .nm{display:block;border-radius:4px;margin:1px 0;padding:0 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:700}
+.nm.영어{background:color-mix(in srgb,var(--en) 45%,var(--card))}.nm.수학{background:color-mix(in srgb,var(--ma) 35%,var(--card))}
 .empty{padding:20px 0;text-align:center;color:var(--mute);font-size:14px}
 .more{display:block;width:100%;margin-top:10px;min-height:44px;border:1px solid var(--line);border-radius:12px;background:none;color:var(--ink);font-weight:700;cursor:pointer}
 .row{display:flex;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--line)}.row:last-child{border:0}.row span{color:var(--mute)}
@@ -175,6 +186,23 @@ const TYPES=['개념평가','맞춤평가','숙제평가','단원평가','내신
 const GRADES=['중1','중2','중3','고1','고2','고3'];
 const gradeChips=(name,cur,req)=>`<div class="rchips" role="radiogroup">${GRADES.map(g=>`<label><input type="radio" name="${name}" value="${g}"${g===cur?' checked':''}${req?' required':''}><span>${g}</span></label>`).join('')}</div>`;
 const gIdx=g=>{const i=GRADES.indexOf(g);return i<0?99:i};
+
+// 보리네 시간표 칸 (평일 / 토요일)
+const WD_SLOTS=[['16:00','4:00'],['17:00','5:00'],['18:30','6:30'],['19:30','7:30'],['20:30','8:30'],['21:30','9:30']];
+const SAT_SLOTS=[['10:00','10:00'],['11:00','11:00'],['13:00','1:00'],['14:00','2:00'],['17:00','5:00'],['18:00','6:00']];
+let regSlots={};
+const shortName=n=>n.length>=3?n.slice(1):n;
+function slotGrid(ctx){ // ctx: 'reg' 등록 / 숫자 학생 / 'all' 전체 보기
+  const mine=(d,t)=>ctx==='reg'?(regSlots[d+'|'+t]||''):typeof ctx==='number'?(ALL_SCHEDULE.find(x=>x.sid===ctx&&x.dow===d&&x.time===t)?.subj||''):'';
+  const others=(d,t)=>ALL_SCHEDULE.filter(x=>x.dow===d&&x.time===t&&x.sid!==ctx&&stu(x.sid));
+  const cell=(d,t)=>{
+    if(ctx==='all'){const xs=others(d,t);return `<td class="sc${xs.length?' on':''}">${xs.map(x=>`<span class="nm ${x.subj}">${esc(shortName(stu(x.sid).name))}</span>`).join('')}</td>`}
+    const m=mine(d,t), xs=others(d,t);
+    return `<td><button type="button" class="sc ${m}" data-slot="${ctx}|${d}|${t}" aria-label="${DOW[d]} ${t} ${m||'없음'}"><b>${m}</b>${xs.length?`<small>${xs.map(x=>esc(shortName(stu(x.sid).name))).join(' ')}</small>`:''}</button></td>`};
+  return `<div class="scroll"><table class="slots"><thead><tr><th></th>${[1,2,3,4,5].map(d=>`<th>${DOW[d]}</th>`).join('')}<th class="sat" colspan="2">토</th></tr></thead><tbody>
+    ${WD_SLOTS.map(([t,l],i)=>`<tr><th>${l}</th>${[1,2,3,4,5].map(d=>cell(d,t)).join('')}<th class="sat">${SAT_SLOTS[i][1]}</th>${cell(6,SAT_SLOTS[i][0])}</tr>`).join('')}
+  </tbody></table></div>`;
+}
 const TERM_ORDER=['중1-1','중1-2','중2-1','중2-2','중3-1','중3-2','고1-1','고1-2','고2-1','고2-2','고3-1','고3-2'];
 let role=null, preview=false, curSid=null, pick=null, pin='', shake=false;
 let A=[],SCHEDULE=[],LESSONS=[],SCHOOL=[],TERMS=[],ME={};
@@ -490,6 +518,7 @@ function tStudents(){
       <div class="full fl">학년${gradeChips('grade','',true)}</div>
       <label>로그인 번호 (4자리)<input name="pin" inputmode="numeric" pattern="\\d{4}" maxlength="4" required></label>
       <div class="full fl">듣는 과목<div class="checks"><label><input type="checkbox" name="subj" value="영어" checked> 영어</label><label><input type="checkbox" name="subj" value="수학"> 수학</label></div></div>
+      <div class="full fl">정규 수업 <span style="font-weight:400">칸을 누를 때마다 영어 → 수학 → 없음 (선택)</span>${slotGrid('reg')}</div>
       <button class="btn full">등록</button></form>
   </div></details>`;
 }
@@ -499,7 +528,9 @@ function tLessons(){
   if(lMode==='sched'){
     const rows=[...ALL_SCHEDULE].filter(s=>stu(s.sid)).sort((a,b)=>((a.dow+6)%7)-((b.dow+6)%7)||a.time.localeCompare(b.time));
     return `<div class="head"><h1>수업</h1></div>${seg}
-    <section class="card"><h2>시간표 추가</h2><form id="schedForm" class="form">
+    <section class="card"><h2>전체 시간표 <small>학생 정규 수업은 학생 페이지에서 고쳐요</small></h2>${slotGrid('all')}
+      <div class="legend"><span><i style="background:var(--en)"></i>영어</span><span><i style="background:var(--ma)"></i>수학</span></div></section>
+    <section class="card"><h2>다른 시간 추가 <small>위 칸에 없는 시간</small></h2><form id="schedForm" class="form">
       <label>학생<select name="sid">${STUDENTS.map(s=>`<option value="${s.id}">${esc(s.name)}</option>`).join('')}</select></label>
       <label>요일<select name="dow">${[1,2,3,4,5,6,0].map(d=>`<option value="${d}">${DOW[d]}</option>`).join('')}</select></label>
       <label>시간<input name="time" type="time" value="18:00" required></label>
@@ -661,13 +692,16 @@ function tStudentDetail(sid){
   <section class="card"><div class="stats"><div class="stat"><b>${avg}${avg==='-'?'':'%'}</b><span>평균 정답률</span></div>
     <div class="stat"><b>${mine.filter(a=>a.status==='todo'&&D(a.given)<=D(TODAY)).length}</b><span>진행 중 과제</span></div>
     <div class="stat"><b>${open.length}</b><span>내 할일</span></div></div></section>
-  <section class="card"><h2>정규 수업 <small>매주 반복 · 여기서 바로 고쳐요</small></h2>
+  <section class="card"><h2>정규 수업 <small>칸을 누르면 바로 저장돼요</small></h2>
+    <p class="muted" style="margin:0 0 8px">${s.subjects.length>1?'누를 때마다 영어 → 수학 → 없음':`누르면 ${s.subjects[0]||'수업'} 추가 · 다시 누르면 없음`} · 작은 글씨는 같은 시간의 다른 학생</p>
+    ${slotGrid(sid)}
+    <details style="margin-top:10px"><summary class="muted">목록으로 보기 · 다른 시간 추가</summary>
     ${ALL_SCHEDULE.filter(x=>x.sid===sid).sort((a,b)=>((a.dow+6)%7)-((b.dow+6)%7)||a.time.localeCompare(b.time)).map(r=>`<div class="srow"><div><b>${DOW[r.dow]}요일</b> ${r.time} ${sTag(r.subj)}</div><button class="btn sm danger" data-delsched="${r.id}" aria-label="삭제">×</button></div>`).join('')||'<div class="empty" style="padding:8px 0">정규 수업이 아직 없어요.</div>'}
     <form id="stuSchedForm" class="form" data-sid="${sid}" style="margin-top:10px">
       <label>요일<select name="dow">${[1,2,3,4,5,6,0].map(d=>`<option value="${d}">${DOW[d]}</option>`).join('')}</select></label>
       <label>시간<input name="time" type="time" value="18:00" required></label>
       <label>과목<select name="subj">${(s.subjects.length?s.subjects:['영어','수학']).map(x=>`<option>${x}</option>`).join('')}</select></label>
-      <button class="btn">수업 추가</button></form></section>
+      <button class="btn">수업 추가</button></form></details></section>
   <section class="card"><h2>다가오는 수업 <small>수업을 누르면 기록·과제·할일</small></h2>${next.length?next.map(row).join(''):'<div class="empty">일주일 안에 수업이 없어요.</div>'}</section>
   <section class="card"><h2>지난 수업 <small>최근 2주</small></h2>${past.length?past.map(row).join(''):'<div class="empty">지난 2주 수업이 없어요.</div>'}</section>
   <section class="card"><h2>과제 <small>처리할 것부터 · 상태를 누르면 채점표</small></h2>${mine.length?[...mine].sort((a,b)=>pri(a)-pri(b)||(pri(a)===5?b.due.localeCompare(a.due):a.due.localeCompare(b.due))).slice(0,showAllHw?999:8).map(a=>`<div class="srow"><div>${sTag(a.subj)} <span class="tag type">${a.type}</span> ${esc(a.title)}<div class="muted" style="font-size:12px">마감 ${mdw(a.due)}</div></div>
@@ -901,7 +935,10 @@ document.addEventListener('submit',async e=>{
     if(!g('grade')){toast('학년을 골라 주세요');return}
     if(!subjects.length){toast('과목을 하나 이상 골라 주세요');return}
     const nm=g('name'),pn=g('pin');
-    await save(()=>DB.api('admin',{action:'create',name:nm,school:g('school'),grade:g('grade'),subjects,pin:pn}),out=>{const n=N(out.id);stuDetail=n;ttab='students';pinNotice={sid:n,pin:pn,isNew:true};return `${nm} 학생을 등록했어요`});window.scrollTo(0,0);return}
+    const slots=Object.entries(regSlots).filter(([,v])=>v&&subjects.includes(v));
+    await save(async()=>{const out=await DB.api('admin',{action:'create',name:nm,school:g('school'),grade:g('grade'),subjects,pin:pn});
+      if(slots.length)await DB.insertMany('schedules',slots.map(([k,v])=>{const[d,t]=k.split('|');return {student_id:out.id,dow:+d,time:t,subject:v}}));
+      regSlots={};return out},out=>{const n=N(out.id);stuDetail=n;ttab='students';pinNotice={sid:n,pin:pn,isNew:true};return `${nm} 학생을 등록했어요`});window.scrollTo(0,0);return}
   if(f.id==='editStuForm'){const sid=+f.dataset.sid, subjects=fd.getAll('subj');
     if(!g('name')){toast('이름을 넣어 주세요');return}if(!subjects.length){toast('과목을 하나 이상 골라 주세요');return}
     await save(()=>DB.update('profiles',{name:g('name'),school:g('school'),grade:g('grade'),subjects},{id:U(sid)}),'학생 정보를 고쳤어요');return}
@@ -1001,6 +1038,16 @@ document.addEventListener('click',async e=>{
   if(d.unedit){editHw=null;armed=null;render();window.scrollTo(0,0);return}
   if(d.rmtarget){const n=+d.rmtarget,k='r'+n;if(armed!==k){armed=k;render();return}armed=null;
     await save(()=>DB.remove('results',{assignment_id:editHw,student_id:U(n)}),`${stu(n).name} 학생을 이 과제에서 뺐어요`);return}
+  if(d.slot){const[ctx,dd,t]=d.slot.split('|'),dow=+dd,key=dow+'|'+t;
+    if(ctx==='reg'){const subs=[...document.querySelectorAll('#stuForm input[name=subj]:checked')].map(x=>x.value);if(!subs.length){toast('먼저 듣는 과목을 골라 주세요');return}
+      const cur=regSlots[key]||'',i=subs.indexOf(cur),nx=i<0?subs[0]:(subs[i+1]||'');regSlots[key]=nx;
+      b.className='sc '+nx;b.querySelector('b').textContent=nx;return}
+    const sid=+ctx,st=stu(sid),subs=st.subjects.length?st.subjects:['영어','수학'],ex=ALL_SCHEDULE.find(x=>x.sid===sid&&x.dow===dow&&x.time===t);
+    const cur=ex?.subj||'',i=subs.indexOf(cur),nx=i<0&&cur?'':(i<0?subs[0]:(subs[i+1]||''));
+    if(!ex)await save(()=>DB.insert('schedules',{student_id:st.uid,dow,time:t,subject:nx}),`${DOW[dow]} ${t} ${nx} 수업을 넣었어요`);
+    else if(nx)await save(()=>DB.update('schedules',{subject:nx},{id:ex.id}),`${DOW[dow]} ${t} ${nx}(으)로 바꿨어요`);
+    else await save(()=>DB.remove('schedules',{id:ex.id}),`${DOW[dow]} ${t} 수업을 뺐어요`);
+    return}
   if(d.gfil){gradeFil=d.gfil;render();return}
   if(d.allhw){showAllHw=true;render();return}
   if(d.ungrade){gradeId=null;gradeHl=null;const gb=gradeBack;gradeBack=null;
