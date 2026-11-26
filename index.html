@@ -132,6 +132,11 @@ tr.hl td{background:color-mix(in srgb,var(--en) 18%,transparent)}
 .chip.sub[aria-pressed=false]{opacity:.5}.chip.sub.영어[aria-pressed=true]{background:var(--en);border-color:var(--en);color:#3a2c00}.chip.sub.수학[aria-pressed=true]{background:var(--ma);border-color:var(--ma);color:#fff}
 .linkbox{font-size:13px;background:var(--soft);border:1px solid var(--line);border-radius:10px;padding:10px;word-break:break-all;user-select:all}
 .card.install{border-color:color-mix(in srgb,var(--en) 55%,var(--line))}
+.rchips{display:flex;flex-wrap:wrap;gap:6px}.rchips label{display:block;cursor:pointer}
+.rchips input{position:absolute;opacity:0;pointer-events:none}
+.rchips span{display:inline-flex;align-items:center;min-height:40px;padding:0 14px;border:1px solid var(--line);border-radius:99px;background:var(--card);color:var(--ink);font-size:15px;font-weight:700}
+.rchips input:checked+span{background:var(--deep);border-color:var(--deep);color:var(--onbtn)}
+.rchips input:focus-visible+span{outline:3px solid var(--en);outline-offset:2px}
 .empty{padding:20px 0;text-align:center;color:var(--mute);font-size:14px}
 .more{display:block;width:100%;margin-top:10px;min-height:44px;border:1px solid var(--line);border-radius:12px;background:none;color:var(--ink);font-weight:700;cursor:pointer}
 .row{display:flex;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--line)}.row:last-child{border:0}.row span{color:var(--mute)}
@@ -167,6 +172,9 @@ const TEACHER={name:'선생님'};
 const stu=id=>STUDENTS.find(s=>s.id===id);
 const ALL_SCHEDULE=[], ALL_LESSONS=[], ASSIGN=[], RESULTS={}, ALL_SCHOOL=[];
 const TYPES=['개념평가','맞춤평가','숙제평가','단원평가','내신모고','기출평가'];
+const GRADES=['중1','중2','중3','고1','고2','고3'];
+const gradeChips=(name,cur,req)=>`<div class="rchips" role="radiogroup">${GRADES.map(g=>`<label><input type="radio" name="${name}" value="${g}"${g===cur?' checked':''}${req?' required':''}><span>${g}</span></label>`).join('')}</div>`;
+const gIdx=g=>{const i=GRADES.indexOf(g);return i<0?99:i};
 const TERM_ORDER=['중1-1','중1-2','중2-1','중2-2','중3-1','중3-2','고1-1','고1-2','고2-1','고2-2','고3-1','고3-2'];
 let role=null, preview=false, curSid=null, pick=null, pin='', shake=false;
 let A=[],SCHEDULE=[],LESSONS=[],SCHOOL=[],TERMS=[],ME={};
@@ -470,14 +478,16 @@ function tToday(){
 
 function tStudents(){
   return `<div class="head"><h1>학생</h1><div class="sub">${STUDENTS.length}명 · 학생을 누르면 수업·과제·할일</div></div>
-  <section class="card"><h2>학생 목록</h2>    ${STUDENTS.map(s=>{const td=TODOS.filter(t=>t.sid===s.id&&!t.done).length, nx=(()=>{for(let i=0;i<8;i++){const d=add(TODAY,i);const o=ALL_SCHEDULE.filter(x=>x.sid===s.id&&x.dow===D(d).getDay()&&!(i===0&&x.time<=NOW_TIME)).sort((a,b)=>a.time.localeCompare(b.time))[0];if(o)return {d,...o}}})();
+  <div class="chips">${['전체',...GRADES.filter(g=>STUDENTS.some(x=>x.grade===g)),...(STUDENTS.some(x=>!GRADES.includes(x.grade))?['기타']:[])].map(g=>{const n=g==='전체'?STUDENTS.length:g==='기타'?STUDENTS.filter(x=>!GRADES.includes(x.grade)).length:STUDENTS.filter(x=>x.grade===g).length;
+    return `<button class="chip" data-gfil="${g}" aria-pressed="${gradeFil===g}">${g} ${n}</button>`}).join('')}</div>
+  <section class="card"><h2>학생 목록 <small>${gradeFil==='전체'?'':gradeFil}</small></h2>    ${STUDENTS.filter(x=>gradeFil==='전체'||(gradeFil==='기타'?!GRADES.includes(x.grade):x.grade===gradeFil)).sort((a,b)=>gIdx(a.grade)-gIdx(b.grade)||a.name.localeCompare(b.name,'ko')).map(s=>{const td=TODOS.filter(t=>t.sid===s.id&&!t.done).length, nx=(()=>{for(let i=0;i<8;i++){const d=add(TODAY,i);const o=ALL_SCHEDULE.filter(x=>x.sid===s.id&&x.dow===D(d).getDay()&&!(i===0&&x.time<=NOW_TIME)).sort((a,b)=>a.time.localeCompare(b.time))[0];if(o)return {d,...o}}})();
       return `<button class="lrow" data-sdetail="${s.id}"><span style="flex:1;text-align:left"><b>${esc(s.name)}</b> <span class="muted">${esc(s.grade)}</span>
       <span style="display:block;font-size:13px;color:var(--mute)">${s.subjects.join('·')}${nx?` · 다음 수업 ${mdw(nx.d)} ${nx.time} ${nx.subj}`:''}</span></span>
       <span class="badges">${td?`<i class="b todo">할일 ${td}</i>`:''}</span><span aria-hidden="true" style="color:var(--mute)">›</span></button>`}).join('')}</section>
   <details class="card"><summary><b>학생 등록</b></summary><div style="margin-top:12px">
     <form id="stuForm" class="form">
       <label>이름<input name="name" required></label><label>학교<input name="school"></label>
-      <label>학년<input name="grade" placeholder="중2"></label>
+      <div class="full fl">학년${gradeChips('grade','',true)}</div>
       <label>로그인 번호 (4자리)<input name="pin" inputmode="numeric" pattern="\\d{4}" maxlength="4" required></label>
       <div class="full fl">듣는 과목<div class="checks"><label><input type="checkbox" name="subj" value="영어" checked> 영어</label><label><input type="checkbox" name="subj" value="수학"> 수학</label></div></div>
       <button class="btn full">등록</button></form>
@@ -532,7 +542,7 @@ function tWork(){
     return `<div class="item" style="background:var(--card)"><div class="top">${sTag(a.subj)}<span class="tag type">${a.type}</span>${w?`<span class="st soon">채점 대기 ${w}</span>`:''}</div>
       <div class="t">${esc(a.title)}</div><div class="meta"><span>${esc(a.unit)}</span></div>
       <div class="meta"><span>내준 날 ${mdw(a.given)}</span><span>마감 ${mdw(a.due)}</span><span>대상 ${rs.length} · 완료 ${done} · 채점 ${gr}</span></div>
-      <div class="acts" style="margin-top:6px"><button class="btn sm" data-grade="${a.id}">채점표</button><button class="btn sm danger" data-delhw="${a.id}">${armed==='h'+a.id?'정말 삭제':'삭제'}</button></div></div>`}).join('')}`;
+      <div class="acts" style="margin-top:6px"><button class="btn sm" data-grade="${a.id}">채점표</button><button class="btn sm ghost" data-edithw="${a.id}">편집</button><button class="btn sm danger" data-delhw="${a.id}">${armed==='h'+a.id?'정말 삭제':'삭제'}</button></div></div>`}).join('')}`;
 }
 
 function tGrade(a){
@@ -583,7 +593,33 @@ function tSchool(){
 }
 // ===== 학생별 페이지 · 수업 페이지 · 내 할일 (선생님 전용) =====
 let TODOS=[];
-let stuDetail=null, lessonCtx=null, backTo=null, gradeHl=null, gradeBack=null;
+let gradeFil='전체', stuDetail=null, lessonCtx=null, backTo=null, gradeHl=null, gradeBack=null, editHw=null, editBack=null, showAllHw=false;
+function tEditHw(a){
+  if(!a){editHw=null;return TVIEWS[ttab]()}
+  const targets=Object.keys(RESULTS[a.id]||{}).map(Number).filter(n=>stu(n)), others=STUDENTS.filter(x=>!targets.includes(x.id));
+  const graded=targets.filter(n=>RESULTS[a.id][n].status==='graded').length;
+  const bl=editBack?.kind==='detail'?`${esc(stu(editBack.sid)?.name||'')} 페이지`:editBack?.kind==='lesson'?'수업 페이지':'과제 목록';
+  return `<div class="head"><button class="undo" data-unedit="1" style="padding:0">← ${bl}</button><h1>과제 편집</h1>
+    <div class="sub">받은 학생 ${targets.length}명 · 채점 ${graded}명 · 고치면 받은 학생 모두에게 적용돼요</div></div>
+  <form id="editHwForm" class="card form" data-id="${a.id}">
+    <label>과목<select name="subj">${['영어','수학'].map(x=>`<option${x===a.subj?' selected':''}>${x}</option>`).join('')}</select></label>
+    <label>종류<select name="type" id="hwType">${TYPES.map(t=>`<option${t===a.type?' selected':''}>${t}</option>`).join('')}</select></label>
+    <label class="full">제목<input name="title" value="${esc(a.title)}" required></label>
+    <label class="full">단원·목차<input name="unit" value="${esc(a.unit)}" required></label>
+    <label>내준 날<input name="given" type="date" value="${a.given}" required></label>
+    <label>마감일<input name="due" type="date" value="${a.due}" required></label>
+    <label>문항 수<input name="total" type="number" min="1" value="${a.total}" required></label>
+    <div class="full form" id="unitOnly" style="display:${a.type==='단원평가'?'grid':'none'}">
+      <label>만점<input name="max" type="number" min="1" value="${a.max??100}"></label>
+      <label>전국 평균<input name="nat" type="number" step="0.1" value="${a.nat??''}"></label>
+      <label>경남 평균<input name="gn" type="number" step="0.1" value="${a.gn??''}"></label></div>
+    <button class="btn full">저장</button></form>
+  <section class="card"><h2>받은 학생 <small>${targets.length}명</small></h2>
+    ${targets.map(n=>{const r=RESULTS[a.id][n];return `<div class="srow"><div><b>${esc(stu(n).name)}</b> <span class="muted">${r.status==='graded'?'채점됨':r.status==='submitted'?'완료 · 채점 전':'진행 중'}</span></div>
+      <button class="btn sm danger" data-rmtarget="${n}">${armed==='r'+n?'정말 빼기':'빼기'}</button></div>`}).join('')||'<div class="empty" style="padding:8px 0">받은 학생이 없어요.</div>'}
+    ${others.length?`<form id="addTargetsForm" class="form" style="margin-top:10px"><div class="full fl">학생 추가<div class="checks">${others.map(x=>`<label><input type="checkbox" name="t" value="${x.id}"> ${esc(x.name)}</label>`).join('')}</div></div><button class="btn">추가</button></form>`:''}</section>
+  <div class="acts" style="margin-bottom:12px"><button class="btn" data-grade="${a.id}">채점표 열기</button><button class="btn danger" data-delhw="${a.id}">${armed==='h'+a.id?'정말 과제 삭제':'과제 삭제'}</button></div>`;
+}
 const timeOf=(sid,date,subj)=>(ALL_SCHEDULE.find(s=>s.sid===sid&&s.subj===subj&&s.dow===D(date).getDay())||{}).time||'';
 const lkey=(sid,date,subj)=>`${sid}|${date}|${subj}`;
 const todosOf=(sid,date,subj)=>TODOS.filter(t=>t.sid===sid&&t.date===date&&t.subj===subj);
@@ -616,13 +652,26 @@ function tStudentDetail(sid){
     <p class="muted" style="margin:8px 0 0">학생이 처음 열 때 번호 네 자리를 한 번 넣으면 그다음부터는 바로 들어가요. 링크가 다른 사람에게 퍼졌으면 "새 링크 만들기"를 누르세요. 예전 링크는 바로 못 써요.</p>`:'<div class="empty">링크를 불러오지 못했어요.</div>'}</section>
   <div class="acts" style="margin-bottom:12px"><button class="btn sm" data-preview="${sid}">학생 화면 보기</button><button class="btn sm ghost" data-repin="${sid}">번호 변경</button>
     <button class="btn sm ghost" data-schoolof="${sid}">학교 성적 입력</button><button class="btn sm danger" data-delstu="${sid}">${armed==='s'+sid?'정말 삭제':'삭제'}</button></div>
+  <details class="card"><summary><b>학생 정보 수정</b> <span class="muted">이름 · 학교 · 학년 · 과목</span></summary>
+    <form id="editStuForm" class="form" data-sid="${sid}" style="margin-top:12px">
+      <label>이름<input name="name" value="${esc(s.name)}" required></label><label>학교<input name="school" value="${esc(s.school)}"></label>
+      <div class="full fl">학년${gradeChips('grade',s.grade,true)}</div>
+      <div class="full fl">듣는 과목<div class="checks">${['영어','수학'].map(x=>`<label><input type="checkbox" name="subj" value="${x}"${s.subjects.includes(x)?' checked':''}> ${x}</label>`).join('')}</div></div>
+      <button class="btn full">저장</button></form></details>
   <section class="card"><div class="stats"><div class="stat"><b>${avg}${avg==='-'?'':'%'}</b><span>평균 정답률</span></div>
     <div class="stat"><b>${mine.filter(a=>a.status==='todo'&&D(a.given)<=D(TODAY)).length}</b><span>진행 중 과제</span></div>
     <div class="stat"><b>${open.length}</b><span>내 할일</span></div></div></section>
+  <section class="card"><h2>정규 수업 <small>매주 반복 · 여기서 바로 고쳐요</small></h2>
+    ${ALL_SCHEDULE.filter(x=>x.sid===sid).sort((a,b)=>((a.dow+6)%7)-((b.dow+6)%7)||a.time.localeCompare(b.time)).map(r=>`<div class="srow"><div><b>${DOW[r.dow]}요일</b> ${r.time} ${sTag(r.subj)}</div><button class="btn sm danger" data-delsched="${r.id}" aria-label="삭제">×</button></div>`).join('')||'<div class="empty" style="padding:8px 0">정규 수업이 아직 없어요.</div>'}
+    <form id="stuSchedForm" class="form" data-sid="${sid}" style="margin-top:10px">
+      <label>요일<select name="dow">${[1,2,3,4,5,6,0].map(d=>`<option value="${d}">${DOW[d]}</option>`).join('')}</select></label>
+      <label>시간<input name="time" type="time" value="18:00" required></label>
+      <label>과목<select name="subj">${(s.subjects.length?s.subjects:['영어','수학']).map(x=>`<option>${x}</option>`).join('')}</select></label>
+      <button class="btn">수업 추가</button></form></section>
   <section class="card"><h2>다가오는 수업 <small>수업을 누르면 기록·과제·할일</small></h2>${next.length?next.map(row).join(''):'<div class="empty">일주일 안에 수업이 없어요.</div>'}</section>
   <section class="card"><h2>지난 수업 <small>최근 2주</small></h2>${past.length?past.map(row).join(''):'<div class="empty">지난 2주 수업이 없어요.</div>'}</section>
-  <section class="card"><h2>과제 현황 <small>처리할 것부터 · 누르면 채점표</small></h2>${mine.length?[...mine].sort((a,b)=>pri(a)-pri(b)||(pri(a)===5?b.due.localeCompare(a.due):a.due.localeCompare(b.due))).slice(0,8).map(a=>`<div class="srow"><div>${sTag(a.subj)} <span class="tag type">${a.type}</span> ${esc(a.title)}<div class="muted" style="font-size:12px">마감 ${mdw(a.due)}</div></div>
-    <button class="glink" data-grade="${a.id}" data-hl="${sid}">${a.status==='graded'&&a.correct!=null?`<b${rate(a)<=50?' style="color:var(--bad)"':''}>${rate(a)}%</b>`:a.status==='submitted'?'<span class="st done">완료 · 채점 전</span>':a.type==='숙제평가'&&a.due<TODAY?'<span class="st late">마감 지남 · 미완료</span>':a.due<=TODAY?'<span class="st soon">채점 전</span>':`<span class="muted">${D(a.given)>D(TODAY)?'예정':'진행 중'}</span>`} ›</button></div>`).join(''):'<div class="empty">과제가 없어요.</div>'}</section>`;
+  <section class="card"><h2>과제 <small>처리할 것부터 · 상태를 누르면 채점표</small></h2>${mine.length?[...mine].sort((a,b)=>pri(a)-pri(b)||(pri(a)===5?b.due.localeCompare(a.due):a.due.localeCompare(b.due))).slice(0,showAllHw?999:8).map(a=>`<div class="srow"><div>${sTag(a.subj)} <span class="tag type">${a.type}</span> ${esc(a.title)}<div class="muted" style="font-size:12px">마감 ${mdw(a.due)}</div></div>
+    <div class="acts" style="align-items:center"><button class="btn sm ghost" data-edithw="${a.id}">편집</button><button class="glink" data-grade="${a.id}" data-hl="${sid}">${a.status==='graded'&&a.correct!=null?`<b${rate(a)<=50?' style="color:var(--bad)"':''}>${rate(a)}%</b>`:a.status==='submitted'?'<span class="st done">완료 · 채점 전</span>':a.type==='숙제평가'&&a.due<TODAY?'<span class="st late">마감 지남 · 미완료</span>':a.due<=TODAY?'<span class="st soon">채점 전</span>':`<span class="muted">${D(a.given)>D(TODAY)?'예정':'진행 중'}</span>`} ›</button></div></div>`).join('')+(mine.length>8&&!showAllHw?`<button class="more" data-allhw="1">과제 ${mine.length}개 모두 보기</button>`:''):'<div class="empty">과제가 없어요. 수업을 눌러 과제를 낼 수 있어요.</div>'}</section>`;
 }
 
 function tLessonPage(){
@@ -652,7 +701,7 @@ function tLessonPage(){
       ${mates.length?`<div class="full fl">같은 시간 학생에게도 내기<div class="checks">${mates.map(m=>`<label><input type="checkbox" name="t" value="${m.sid}" checked> ${esc(stu(m.sid).name)}</label>`).join('')}</div></div>`:''}
       <button class="btn full">${esc(s.name)}${mates.length?' 외':''}에게 과제 내기</button></form></section>
   <section class="card"><h2>낸 과제 <small>${given.length}개</small></h2>
-    ${given.map(a=>`<div class="srow"><div><span class="tag type">${a.type}</span> <b>${esc(a.title)}</b><div class="muted" style="font-size:12px">${esc(a.unit)} · 마감 ${mdw(a.due)} · ${a.total}문항</div></div><button class="btn sm ghost" data-grade="${a.id}">채점표</button></div>`).join('')||'<div class="empty" style="padding:10px 0">아직 낸 과제가 없어요.</div>'}
+    ${given.map(a=>`<div class="srow"><div><span class="tag type">${a.type}</span> <b>${esc(a.title)}</b><div class="muted" style="font-size:12px">${esc(a.unit)} · 마감 ${mdw(a.due)} · ${a.total}문항</div></div><div class="acts"><button class="btn sm ghost" data-edithw="${a.id}">편집</button><button class="btn sm ghost" data-grade="${a.id}">채점표</button></div></div>`).join('')||'<div class="empty" style="padding:10px 0">아직 낸 과제가 없어요.</div>'}
 </section>
   <section class="card private"><h2>🔒 내 할일 <small>선생님만 보여요</small></h2>
     ${td.length?td.map(t=>todoRow(t,false)).join(''):'<div class="empty" style="padding:10px 0">이 수업에 연결된 할일이 없어요.</div>'}
@@ -808,7 +857,7 @@ function render(){
   tick();
   if(!role){view.innerHTML=login();bar.hidden=true;return}
   bar.hidden=false;
-  if(role==='teacher'&&!preview){view.innerHTML=lessonCtx?tLessonPage():(ttab==='students'&&stuDetail!=null)?tStudentDetail(stuDetail):TVIEWS[ttab]();bar.style.setProperty('--n',6);bar.innerHTML=tabsHtml(TTABS,ttab,'ttab');return}
+  if(role==='teacher'&&!preview){view.innerHTML=editHw!=null?tEditHw(ASSIGN.find(x=>x.id===editHw)):lessonCtx?tLessonPage():(ttab==='students'&&stuDetail!=null)?tStudentDetail(stuDetail):TVIEWS[ttab]();bar.style.setProperty('--n',6);bar.innerHTML=tabsHtml(TTABS,ttab,'ttab');return}
   load(curSid);bar.style.setProperty('--n',5);
   view.innerHTML=(preview?`<div class="pv"><span>미리보기 · ${esc(ME.name)} 학생 화면</span><button data-endpreview="1">선생님 화면으로</button></div>`:'')+(sLesson?sLessonPage():{home,lesson,homework,grades,my}[tab]());
   bar.innerHTML=tabsHtml(TABS,tab,'tab');
@@ -849,9 +898,25 @@ document.addEventListener('submit',async e=>{
     const subjects=fd.getAll('subj');
     if(!g('name')){toast('이름을 넣어 주세요');return}
     if(!/^\d{4}$/.test(g('pin'))){toast('로그인 번호는 숫자 4자리예요');return}
+    if(!g('grade')){toast('학년을 골라 주세요');return}
     if(!subjects.length){toast('과목을 하나 이상 골라 주세요');return}
     const nm=g('name'),pn=g('pin');
     await save(()=>DB.api('admin',{action:'create',name:nm,school:g('school'),grade:g('grade'),subjects,pin:pn}),out=>{const n=N(out.id);stuDetail=n;ttab='students';pinNotice={sid:n,pin:pn,isNew:true};return `${nm} 학생을 등록했어요`});window.scrollTo(0,0);return}
+  if(f.id==='editStuForm'){const sid=+f.dataset.sid, subjects=fd.getAll('subj');
+    if(!g('name')){toast('이름을 넣어 주세요');return}if(!subjects.length){toast('과목을 하나 이상 골라 주세요');return}
+    await save(()=>DB.update('profiles',{name:g('name'),school:g('school'),grade:g('grade'),subjects},{id:U(sid)}),'학생 정보를 고쳤어요');return}
+  if(f.id==='stuSchedForm'){const sid=+f.dataset.sid;
+    await save(()=>DB.insert('schedules',{student_id:U(sid),dow:+g('dow'),time:g('time'),subject:g('subj')}),`${DOW[+g('dow')]}요일 ${g('time')} 수업을 추가했어요`);return}
+  if(f.id==='editHwForm'){const id=+f.dataset.id, a=ASSIGN.find(x=>x.id===id), total=+g('total');
+    if(!g('title')||!g('unit')){toast('제목과 단원·목차를 넣어 주세요');return}
+    if(g('due')<g('given')){toast('마감일이 내준 날보다 빨라요');return}
+    const maxC=Math.max(0,...Object.values(RESULTS[id]||{}).map(r=>r.correct??0));
+    if(!(total>=1)||total<maxC){toast(`문항 수는 이미 채점된 맞은 수(${maxC})보다 작을 수 없어요`);return}
+    const row={subject:g('subj'),type:g('type'),title:g('title'),unit:g('unit'),given:g('given'),due:g('due'),total};
+    if(row.type==='단원평가'){row.max=+g('max')||100;row.nat=num(g('nat'));row.gn=num(g('gn'))}else{row.max=null;row.nat=null;row.gn=null}
+    await save(()=>DB.update('assignments',row,{id}),'과제를 고쳤어요');return}
+  if(f.id==='addTargetsForm'){const ts=fd.getAll('t').map(Number);if(!ts.length){toast('추가할 학생을 골라 주세요');return}
+    await save(()=>DB.insertMany('results',ts.map(n=>({assignment_id:editHw,student_id:U(n)}))),`${ts.length}명에게 과제를 추가했어요`);return}
   if(f.id==='schedForm'){
     await save(()=>DB.insert('schedules',{student_id:U(+g('sid')),dow:+g('dow'),time:g('time'),subject:g('subj')}),'시간표에 추가했어요');return}
   if(f.id==='lessonForm'){
@@ -903,8 +968,8 @@ document.addEventListener('click',async e=>{
   if(d.done||d.undo){if(preview){toast('미리보기에서는 체크할 수 없어요');return}const on=!!d.done;
     await save(()=>DB.rpc('set_done',{p_assignment:+(d.done||d.undo),p_done:on}),on?()=>`완료했어요 · ${TODAY.slice(5).replace('-','/')} ${NOW_TIME}`:'완료 체크를 취소했어요');return}
   // 선생님
-  if(d.ttab){gradeId=null;lessonCtx=null;stuDetail=null;goT(d.ttab);return}
-  if(d.sdetail){ttab='students';stuDetail=+d.sdetail;lessonCtx=null;armed=null;pinNotice=null;render();window.scrollTo(0,0);return}
+  if(d.ttab){gradeId=null;lessonCtx=null;stuDetail=null;editHw=null;showAllHw=false;goT(d.ttab);return}
+  if(d.sdetail){ttab='students';editHw=null;showAllHw=false;stuDetail=+d.sdetail;lessonCtx=null;armed=null;pinNotice=null;render();window.scrollTo(0,0);return}
   if(d.sback){stuDetail=null;pinNotice=null;render();return}
   if(d.open){const[sid,date,subj]=d.open.split('|');backTo=lessonCtx?backTo:(ttab==='students'&&stuDetail!=null?'detail':ttab==='today'?'today':'lessons');
     if(backTo==='detail')stuDetail=+sid;lessonCtx={sid:+sid,date,subj};gradeId=null;render();window.scrollTo(0,0);return}
@@ -928,13 +993,20 @@ document.addEventListener('click',async e=>{
   if(d.lmode){lMode=d.lmode;render();return}
   if(d.lstep){logDate=add(logDate,+d.lstep);render();return}
   if(d.hwv){hwView=d.hwv;render();return}
-  if(d.grade){gradeBack=lessonCtx?{kind:'lesson',ctx:lessonCtx,back:backTo}:(ttab==='students'&&stuDetail!=null)?{kind:'detail',sid:stuDetail}:ttab==='today'?{kind:'today'}:null;
+  if(d.grade){editHw=null;gradeBack=lessonCtx?{kind:'lesson',ctx:lessonCtx,back:backTo}:(ttab==='students'&&stuDetail!=null)?{kind:'detail',sid:stuDetail}:ttab==='today'?{kind:'today'}:null;
     gradeHl=d.hl?+d.hl:null;ttab='work';lessonCtx=null;stuDetail=null;gradeId=+d.grade;render();
     const r=document.getElementById('hlrow');if(r){r.scrollIntoView({block:'center'});r.querySelector('input')?.focus({preventScroll:true})}else window.scrollTo(0,0);return}
+  if(d.edithw){editBack=lessonCtx?{kind:'lesson',ctx:lessonCtx,back:backTo}:(ttab==='students'&&stuDetail!=null)?{kind:'detail',sid:stuDetail}:{kind:'work'};
+    editHw=+d.edithw;armed=null;render();window.scrollTo(0,0);return}
+  if(d.unedit){editHw=null;armed=null;render();window.scrollTo(0,0);return}
+  if(d.rmtarget){const n=+d.rmtarget,k='r'+n;if(armed!==k){armed=k;render();return}armed=null;
+    await save(()=>DB.remove('results',{assignment_id:editHw,student_id:U(n)}),`${stu(n).name} 학생을 이 과제에서 뺐어요`);return}
+  if(d.gfil){gradeFil=d.gfil;render();return}
+  if(d.allhw){showAllHw=true;render();return}
   if(d.ungrade){gradeId=null;gradeHl=null;const gb=gradeBack;gradeBack=null;
     if(gb?.kind==='detail'){ttab='students';stuDetail=gb.sid}else if(gb?.kind==='lesson'){lessonCtx=gb.ctx;backTo=gb.back}else if(gb?.kind==='today'){ttab='today'}
     render();window.scrollTo(0,0);return}
-  if(d.delhw){const k='h'+d.delhw;if(armed!==k){armed=k;render();return}armed=null;await save(()=>DB.remove('assignments',{id:+d.delhw}),'과제를 삭제했어요');return}
+  if(d.delhw){const k='h'+d.delhw;if(armed!==k){armed=k;render();return}armed=null;editHw=null;await save(()=>DB.remove('assignments',{id:+d.delhw}),'과제를 삭제했어요');return}
   if(d.editschool){const[t,sj]=d.editschool.split('|'),r=ALL_SCHOOL.find(x=>x.sid===schoolSid&&x.term===t&&x.subj===sj),f=document.getElementById('schoolForm');
     if(r&&f){f.elements.term.value=t;f.elements.subj.value=sj;['mid','fin','avg','lv','rank','n'].forEach(k=>f.elements[k].value=r[k]??'');f.scrollIntoView({block:'start'});toast(`${t} ${sj} 수정 중`)}return}
   if(d.delschool){const[sid,t,s]=d.delschool.split('|');await save(()=>DB.remove('school_grades',{student_id:U(+sid),term:t,subject:s}));return}
