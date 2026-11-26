@@ -132,9 +132,9 @@ tr.hl td{background:color-mix(in srgb,var(--en) 18%,transparent)}
 .chip.sub[aria-pressed=false]{opacity:.5}.chip.sub.영어[aria-pressed=true]{background:var(--en);border-color:var(--en);color:#3a2c00}.chip.sub.수학[aria-pressed=true]{background:var(--ma);border-color:var(--ma);color:#fff}
 .linkbox{font-size:13px;background:var(--soft);border:1px solid var(--line);border-radius:10px;padding:10px;word-break:break-all;user-select:all}
 .card.install{border-color:color-mix(in srgb,var(--en) 55%,var(--line))}
-.rchips{display:flex;flex-wrap:wrap;gap:6px}.rchips label{display:block;cursor:pointer}
+.rchips{display:grid;grid-template-columns:repeat(6,minmax(46px,1fr));gap:6px;overflow-x:auto;scroll-snap-type:x proximity;padding-bottom:2px;-webkit-overflow-scrolling:touch}.rchips label{display:block;cursor:pointer;scroll-snap-align:start}
 .rchips input{position:absolute;opacity:0;pointer-events:none}
-.rchips span{display:inline-flex;align-items:center;min-height:40px;padding:0 14px;border:1px solid var(--line);border-radius:99px;background:var(--card);color:var(--ink);font-size:15px;font-weight:700}
+.rchips span{display:flex;align-items:center;justify-content:center;min-height:42px;padding:0 4px;border:1px solid var(--line);border-radius:99px;background:var(--card);color:var(--ink);font-size:15px;font-weight:700}
 .rchips input:checked+span{background:var(--deep);border-color:var(--deep);color:var(--onbtn)}
 .rchips input:focus-visible+span{outline:3px solid var(--en);outline-offset:2px}
 .slots{border-collapse:separate;border-spacing:2px;width:100%;min-width:290px;table-layout:fixed}
