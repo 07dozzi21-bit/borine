@@ -1,0 +1,982 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>보리네</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="apple-touch-icon" href="./icon-180.png">
+<link rel="icon" href="./icon-192.png">
+<meta name="apple-mobile-web-app-title" content="보리네">
+<meta name="theme-color" content="#00462A">
+<link rel="manifest" href="./manifest.webmanifest">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+/* VOICE: 학생이 매일 여는 차분한 학습 수첩
+   IDEA: 보리네 알림장 + 성적표를 한 손에
+   PICTURE: 각 탭의 실제 카드·캘린더·그래프가 곧 화면
+   COLOUR and TYPE: 흰 카드, 녹흑 잉크, 영어=보리 금색, 수학=청록 / Noto Sans KR
+   LAYOUT: 한 열, 폰 우선, 하단 고정 탭바 5개 */
+:root{color-scheme:light dark;
+  --bg:light-dark(#f3f4f0,#101311);--card:light-dark(#fff,#1a1f1b);--ink:light-dark(#17221b,#eef1ec);
+  --mute:light-dark(#5b6557,#a3ab9f);--line:light-dark(#e1e4dc,#2b322c);--bar:light-dark(#d7dcd2,#3a423b);
+  --deep:light-dark(#5f635f,#a3a8a3);--onbtn:light-dark(#fff,#111);--priv:light-dark(#00462A,#7bc59a);--soft:light-dark(#f6f7f3,#222823);
+  --en:light-dark(#f2c200,#f5cf3a);--ma:light-dark(#2f9e44,#69db7c);--bad:light-dark(#b3261e,#f2b8b5);--ok:light-dark(#2f6b2a,#9fd49a)}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 "Noto Sans KR",system-ui,sans-serif;overflow-x:clip;
+  padding:env(safe-area-inset-top) env(safe-area-inset-right) calc(84px + env(safe-area-inset-bottom)) env(safe-area-inset-left)}
+.demo{background:var(--deep);color:var(--onbtn);font-size:12px;text-align:center;padding:5px 12px}
+.wrap{max-width:720px;margin:0 auto;padding:6px 14px 20px}
+.head{padding:16px 2px 14px}.head h1{margin:0;font-size:24px;line-height:1.2;font-weight:900}.head .sub{font-size:14px;color:var(--mute)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:16px;margin-bottom:12px}
+.card h2{margin:0 0 10px;font-size:17px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.card h2 small{font-size:13px;font-weight:500;color:var(--mute)}
+.muted{color:var(--mute);font-size:14px}
+.seg{display:flex;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:4px;gap:4px;margin-bottom:12px}
+.seg button{flex:1;min-height:40px;border:0;border-radius:9px;background:none;font:inherit;font-size:15px;font-weight:700;color:var(--mute);cursor:pointer}
+.seg button[aria-pressed=true]{background:var(--deep);color:var(--onbtn)}
+button{font:inherit}:focus-visible{outline:3px solid var(--en);outline-offset:2px}
+.tag{display:inline-block;font-size:12px;font-weight:700;padding:2px 8px;border-radius:99px;white-space:nowrap}
+.tag.영어{background:color-mix(in srgb,var(--en) 28%,transparent);color:light-dark(#7a5c00,#f5cf3a)}
+.tag.수학{background:color-mix(in srgb,var(--ma) 16%,transparent);color:light-dark(#237a34,#69db7c)}
+.tag.type{background:var(--soft);color:var(--mute);font-weight:500}
+.item{border:1px solid var(--line);border-radius:14px;padding:12px;margin-top:8px;display:grid;gap:4px}
+.item .t{font-weight:700}.item .meta{font-size:13px;color:var(--mute);display:flex;flex-wrap:wrap;gap:4px 10px}
+.item .top{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.st{margin-left:auto;font-size:13px;font-weight:700;white-space:nowrap}
+.st.late{color:var(--bad)}.st.done{color:var(--ok)}.st.soon{color:light-dark(#8a5a00,#f0c46a)}
+.next{display:flex;gap:14px;align-items:center}
+.next .when{background:var(--deep);color:var(--onbtn);border-radius:14px;padding:10px 14px;text-align:center;min-width:86px}
+.next .when b{display:block;font-size:24px;line-height:1.1}.next .when span{font-size:13px;opacity:.85}
+.week{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.day{border:1px solid var(--line);border-radius:10px;padding:6px 2px;text-align:center;min-height:64px;background:var(--card);color:var(--ink);cursor:pointer;display:grid;align-content:start;gap:2px}
+.day small{font-size:11px;color:var(--mute)}.day b{font-size:15px}
+.day.today{border-color:var(--deep);border-width:2px}.day[aria-pressed=true]{background:var(--deep);color:var(--onbtn)}.day[aria-pressed=true] small{color:inherit;opacity:.8}
+.day.out{opacity:.4}.day .dots{display:flex;gap:2px;justify-content:center;flex-wrap:wrap}
+.dot{width:6px;height:6px;border-radius:50%}.dot.영어{background:var(--en)}.dot.수학{background:var(--ma)}
+.dow{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;font-size:12px;color:var(--mute);text-align:center;margin-bottom:4px}
+.nav{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.nav b{font-size:16px}.nav button{width:44px;height:44px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink);cursor:pointer;font-size:18px}
+.slot{display:flex;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}.slot:last-child{border:0}
+.slot .d{width:62px;font-weight:700;font-size:14px}.slot.now .d{color:var(--deep)}
+.fb{border-left:3px solid var(--line);padding:4px 0 4px 12px;margin-top:12px}
+.fb p{margin:4px 0 0;font-size:15px}.fb .k{font-size:12px;font-weight:700;color:var(--mute);margin-right:6px}
+.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.stat{background:var(--soft);border-radius:12px;padding:12px}.stat b{display:block;font-size:clamp(20px,5.4vw,26px);line-height:1.2}.stat span{font-size:12px;color:var(--mute)}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.chip{min-height:36px;padding:0 14px;border:1px solid var(--line);border-radius:99px;background:var(--card);color:var(--ink);cursor:pointer;font-size:14px}
+.chip[aria-pressed=true]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.cmp{display:grid;grid-template-columns:44px 1fr 44px;gap:6px 8px;align-items:center;font-size:13px;margin-top:6px}
+.cmp .b{height:12px;border-radius:6px;background:var(--bar)}.cmp .b.me{background:var(--deep)}.cmp .v{text-align:right;font-weight:700}
+.weak{display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid var(--line)}.weak:last-child{border:0}
+.weak .n{margin-left:auto;font-size:13px;font-weight:700;color:var(--bad);white-space:nowrap}
+table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:9px 4px;border-bottom:1px solid var(--line);font-size:14px}
+th{font-size:12px;color:var(--mute);font-weight:500}.num{text-align:right;white-space:nowrap}
+.legend{display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:var(--mute);margin-top:6px}.legend i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:-1px}
+.check{justify-self:start;margin-top:6px;min-height:40px;padding:0 16px;border:0;border-radius:10px;background:var(--deep);color:var(--onbtn);font-weight:700;cursor:pointer}
+.doneat{margin-top:4px;font-size:13px;font-weight:700;color:var(--ok);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.undo{border:0;background:none;color:var(--mute);text-decoration:underline;font-size:13px;cursor:pointer;min-height:32px}
+.toast{position:fixed;left:50%;bottom:calc(84px + env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 18px;border-radius:99px;font-size:14px;opacity:0;transition:opacity .25s;pointer-events:none;z-index:20;white-space:nowrap}
+.toast.on{opacity:1}
+.names{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px}
+.name{min-height:64px;border:1px solid var(--line);border-radius:14px;background:var(--card);color:var(--ink);cursor:pointer;display:grid;place-content:center;gap:2px}
+.name b{font-size:18px}.name span{font-size:13px;color:var(--mute)}
+.pinbox{max-width:360px;margin:0 auto 12px}
+.pins{display:flex;justify-content:center;gap:16px;margin-top:6px}.pins i{width:16px;height:16px;border-radius:50%;border:2px solid var(--mute)}
+.pins i.on{background:var(--deep);border-color:var(--deep)}
+.pins.shake{animation:shake .35s}@keyframes shake{25%{transform:translateX(-8px)}50%{transform:translateX(8px)}75%{transform:translateX(-4px)}}
+.pad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.pad button{min-height:60px;border:1px solid var(--line);border-radius:14px;background:var(--soft);color:var(--ink);font-size:24px;font-weight:700;cursor:pointer}
+.pad button:disabled{opacity:.4;cursor:default}
+.keep{display:flex;align-items:center;justify-content:center;gap:6px;font-size:12px;color:var(--mute);text-align:center}.keep input{width:18px;height:18px}
+.form{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;align-items:end}
+.form label,.fl{display:grid;gap:4px;font-size:13px;color:var(--mute)}.form .full{grid-column:1/-1}
+input,select,textarea{font:inherit;font-size:16px;color:var(--ink);background:var(--soft);border:1px solid var(--line);border-radius:10px;min-height:44px;padding:8px 12px;width:100%}
+textarea{min-height:64px;resize:vertical}input[type=checkbox]{width:20px;height:20px;min-height:0;padding:0;accent-color:var(--deep)}
+input.gin{width:72px;text-align:right;padding:6px 8px}
+.btn{min-height:44px;padding:0 16px;border-radius:10px;border:0;font-weight:700;background:var(--deep);color:var(--onbtn);cursor:pointer}
+.btn.ghost{background:none;border:1px solid var(--line);color:var(--ink)}.btn.sm{min-height:36px;padding:0 12px;font-size:14px}
+.btn.danger{background:none;border:1px solid var(--line);color:var(--bad)}
+.checks{display:flex;flex-wrap:wrap;gap:8px}.checks label{display:flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:99px;padding:6px 12px;font-size:14px;color:var(--ink);background:var(--card)}
+.pv{position:sticky;top:0;z-index:5;background:var(--soft);border:1px solid var(--line);color:var(--ink);font-size:14px;font-weight:700;display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 12px;border-radius:12px;margin-top:8px}
+.pv button{background:var(--deep);color:var(--onbtn);border:0;border-radius:8px;min-height:36px;padding:0 10px;font-weight:700;cursor:pointer}
+.srow{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line);flex-wrap:wrap}.srow:last-child{border:0}
+.acts{display:flex;gap:6px;flex-wrap:wrap}.scroll{overflow-x:auto}
+.lrow{display:flex;align-items:center;gap:10px;width:100%;padding:11px 4px;border:0;border-bottom:1px solid var(--line);background:none;color:var(--ink);cursor:pointer;font-size:15px}
+.lrow:last-child{border-bottom:0}.lrow .d{display:grid;min-width:62px;font-weight:700;font-size:14px;text-align:left}.lrow .d small{font-weight:400;color:var(--mute);font-size:12px}
+.badges{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end}.b{font-style:normal;font-size:11px;font-weight:700;padding:2px 7px;border-radius:99px;white-space:nowrap}
+.b.ok{background:color-mix(in srgb,var(--ok) 15%,transparent);color:var(--ok)}.b.no{background:color-mix(in srgb,var(--bad) 12%,transparent);color:var(--bad)}
+.b.todo{background:color-mix(in srgb,var(--priv) 14%,transparent);color:var(--priv)}
+.card.private{border-style:dashed;border-color:color-mix(in srgb,var(--priv) 40%,var(--line));background:color-mix(in srgb,var(--priv) 7%,var(--card))}
+.todo{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)}.todo:last-of-type{border-bottom:0}
+.todo.done .tt{text-decoration:line-through;color:var(--mute)}
+.tick{width:28px;height:28px;flex:none;border-radius:8px;border:2px solid var(--mute);background:var(--card);color:var(--onbtn);font-weight:900;cursor:pointer;display:grid;place-items:center}
+.tick[aria-pressed=true]{background:var(--deep);border-color:var(--deep)}
+a.lk{color:inherit;text-decoration:underline;cursor:pointer}
+details.card summary{cursor:pointer;min-height:28px;list-style-position:inside}
+.glink{border:0;background:none;color:var(--ink);cursor:pointer;min-height:40px;font-size:14px;white-space:nowrap;padding:0 2px}
+tr.hl td{background:color-mix(in srgb,var(--en) 18%,transparent)}
+.lv{font-size:20px;font-weight:900;padding:2px 12px;border-radius:10px;background:var(--soft);border:1px solid var(--line)}.lv.none{font-size:13px;font-weight:500;color:var(--mute)}
+.lk2{border:0;background:none;padding:0;color:inherit;font:inherit;cursor:pointer;text-align:left;text-decoration:underline;text-decoration-color:var(--line);text-underline-offset:3px}
+.lk2.chipl{text-decoration:none;min-height:36px}
+.lbtn{width:100%;border:0;background:none;color:var(--ink);cursor:pointer;padding:0;font:inherit}
+.bigrate{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}.bigrate b{font-size:clamp(44px,13vw,60px);font-weight:900;line-height:1}.bigrate span{color:var(--mute);font-size:14px}
+.dl{font-size:13px;font-weight:700;margin-left:4px;white-space:nowrap}.dl.up{color:var(--ok)}.dl.down{color:var(--bad)}
+.note{margin-top:12px;background:var(--soft);border-radius:12px;padding:12px}.note p{margin:4px 0 0;font-size:15px}
+.sbar{display:grid;grid-template-columns:auto 1fr auto auto;gap:8px;align-items:center;padding:7px 0}
+.track{height:12px;border-radius:6px;background:var(--bar);overflow:hidden}.track i{display:block;height:100%;background:var(--deep);border-radius:6px}
+.chip.sub[aria-pressed=false]{opacity:.5}.chip.sub.영어[aria-pressed=true]{background:var(--en);border-color:var(--en);color:#3a2c00}.chip.sub.수학[aria-pressed=true]{background:var(--ma);border-color:var(--ma);color:#fff}
+.linkbox{font-size:13px;background:var(--soft);border:1px solid var(--line);border-radius:10px;padding:10px;word-break:break-all;user-select:all}
+.card.install{border-color:color-mix(in srgb,var(--en) 55%,var(--line))}
+.empty{padding:20px 0;text-align:center;color:var(--mute);font-size:14px}
+.more{display:block;width:100%;margin-top:10px;min-height:44px;border:1px solid var(--line);border-radius:12px;background:none;color:var(--ink);font-weight:700;cursor:pointer}
+.row{display:flex;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--line)}.row:last-child{border:0}.row span{color:var(--mute)}
+.tabbar{position:fixed;left:0;right:0;bottom:0;z-index:10;background:color-mix(in srgb,var(--card) 92%,transparent);backdrop-filter:blur(10px);
+  border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(var(--n,5),1fr);padding:6px 4px calc(6px + env(safe-area-inset-bottom))}
+.tabbar button{border:0;background:none;color:var(--mute);display:grid;justify-items:center;gap:2px;font-size:12px;min-height:52px;cursor:pointer;padding:4px 0}
+.tabbar svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.tabbar button[aria-current=page]{color:var(--ink);font-weight:700}
+.tabbar button[aria-current=page] svg{stroke-width:2.3}
+@media(prefers-reduced-motion:no-preference){.view{animation:fade .18s ease-out}@keyframes fade{from{opacity:0;transform:translateY(4px)}}}
+</style>
+</head>
+<body>
+<main class="wrap"><div class="view" id="view"></div></main>
+<div class="toast" id="toast" role="status"></div>
+<nav class="tabbar" id="tabbar" aria-label="메뉴"></nav>
+<script>
+{
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let TODAY=(d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`)(new Date()), NOW_TIME='00:00'; const DOW=['일','월','화','수','목','금','토'];
+const D=s=>{const[y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d)};
+const S=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+const add=(s,n)=>{const d=D(s);d.setDate(d.getDate()+n);return S(d)};
+const md=s=>{const d=D(s);return `${d.getMonth()+1}/${d.getDate()}`};
+const mdw=s=>{const d=D(s);return `${d.getMonth()+1}/${d.getDate()}(${DOW[d.getDay()]})`};
+const diff=(a,b)=>Math.round((D(a)-D(b))/864e5);
+const monday=s=>{const d=D(s);return add(s,-((d.getDay()+6)%7))};
+
+let nid=0;
+// 실제 데이터는 로그인 후 데이터베이스에서 불러와요 (loadAll)
+const STUDENTS=[];
+const TEACHER={name:'선생님'};
+const stu=id=>STUDENTS.find(s=>s.id===id);
+const ALL_SCHEDULE=[], ALL_LESSONS=[], ASSIGN=[], RESULTS={}, ALL_SCHOOL=[];
+const TYPES=['개념평가','맞춤평가','숙제평가','단원평가','내신모고','기출평가'];
+const TERM_ORDER=['중1-1','중1-2','중2-1','중2-2','중3-1','중3-2','고1-1','고1-2','고2-1','고2-2','고3-1','고3-2'];
+let role=null, preview=false, curSid=null, pick=null, pin='', shake=false;
+let A=[],SCHEDULE=[],LESSONS=[],SCHOOL=[],TERMS=[],ME={};
+let tab='home', hwMode='day', hwDate=TODAY, gTab='borine', gPer='전체', gSubs={영어:true,수학:true}, rDate=TODAY, term=null;
+let ttab='today', lMode='log', logDate=TODAY, hwView='list', gradeId=null, schoolSid=null, armed=null;
+function load(sid){
+  const s=stu(sid)||{id:sid,name:'',school:'',grade:'',subjects:[]}; curSid=sid; ME={...s,teacher:TEACHER.name};
+  A=ASSIGN.filter(a=>RESULTS[a.id]&&RESULTS[a.id][sid]).map(a=>({...a,...RESULTS[a.id][sid]}));
+  SCHEDULE=ALL_SCHEDULE.filter(x=>x.sid===sid).sort((a,b)=>((a.dow+6)%7)-((b.dow+6)%7)||a.time.localeCompare(b.time));
+  LESSONS=ALL_LESSONS.filter(x=>x.sid===sid).sort((a,b)=>b.date.localeCompare(a.date));
+  SCHOOL=ALL_SCHOOL.filter(x=>x.sid===sid);
+  TERMS=TERM_ORDER.filter(t=>SCHOOL.some(r=>r.term===t));
+  if(!TERMS.includes(term))term=TERMS[TERMS.length-1]||null;
+}
+const TABS=[
+  {id:'home',label:'홈',icon:'<path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/>'},
+  {id:'lesson',label:'수업',icon:'<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/>'},
+  {id:'homework',label:'과제',icon:'<path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 13l2 2 4-4"/>'},
+  {id:'grades',label:'성적',icon:'<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>'},
+  {id:'my',label:'MY',icon:'<circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/>'}
+];
+const TTABS=[
+  {id:'today',label:'오늘',icon:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>'},
+  {id:'todos',label:'할일',icon:'<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8l1.5 1.5L12 7M8 14l1.5 1.5L12 13M14 8.5h3M14 14.5h3"/>'},
+  {id:'students',label:'학생',icon:'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c1-3.5 3.5-5 6.5-5s5.5 1.5 6.5 5M16 4.6a3.5 3.5 0 0 1 0 6.8M18 15c2 .6 3.2 2.2 3.8 5"/>'},
+  {id:'lessons',label:'수업',icon:'<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/>'},
+  {id:'work',label:'과제',icon:'<path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 14l2 2 4-4"/>'},
+  {id:'school',label:'학교성적',icon:'<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>'}
+];
+const view=document.getElementById('view'), bar=document.getElementById('tabbar');
+
+const rate=a=>Math.round(a.correct/a.total*1000)/10;
+const fmtAt=t=>{const[d,hm]=t.split(' ');return `${md(d)} ${hm}`};
+const lateMark=a=>a.doneAt&&a.doneAt.slice(0,10)>a.due?' · 마감 후':'';
+function stat(a){
+  if(a.status==='graded') return `<span class="st done">${a.type==='단원평가'?`${a.score}점`:`${a.correct}/${a.total}`}</span>`;
+  if(a.status==='submitted') return `<span class="st done">완료 · 채점 전</span>`;
+  const d=diff(a.due,TODAY);
+  if(d<0&&a.type!=='숙제평가') return `<span class="st">채점 전</span>`;
+  if(d<0) return `<span class="st late">기한 지남</span>`;
+  return `<span class="st ${d<=1?'soon':''}">${d===0?'오늘 마감':'D-'+d}</span>`;
+}
+let sLesson=null, sBack=null;
+const myTime=(date,subj)=>(SCHEDULE.find(x=>x.subj===subj&&x.dow===D(date).getDay())||{}).time||'';
+const isLessonDay=(date,subj)=>!!myTime(date,subj);
+const gotHw=(date,subj)=>A.filter(a=>a.subj===subj&&a.given===date);
+const dueHw=(date,subj)=>A.filter(a=>a.subj===subj&&a.due===date);
+const lessonBtn=(date,subj,label)=>isLessonDay(date,subj)?`<button class="lk2" data-slesson="${date}|${subj}">${label}</button>`:`<span>내준 날 ${mdw(date)}</span>`;
+function sLessonPage(){
+  const {date,subj}=sLesson, l=LESSONS.find(x=>x.date===date&&x.subj===subj)||{}, time=myTime(date,subj);
+  const got=gotHw(date,subj), due=dueHw(date,subj).filter(a=>!got.includes(a));
+  const past=date<TODAY||(date===TODAY&&time<=NOW_TIME);
+  return `<div class="head"><button class="undo" data-sback="1" style="padding:0">← 돌아가기</button><h1>${sTag(subj)} ${mdw(date)} 수업</h1>
+    <div class="sub">${time}${date===TODAY?' · 오늘':past?'':' · 예정'}</div></div>
+  <section class="card"><h2>수업 내용</h2>
+    <div style="font-weight:700;font-size:17px">${esc(l.topic||'수업 내용 준비 중')}</div>${l.prep?`<div class="muted" style="margin-top:4px">준비: ${esc(l.prep)}</div>`:''}
+    ${l.good?`<div class="fb" style="border-color:var(--${subj==='영어'?'en':'ma'})"><p><span class="k">잘한 점</span>${esc(l.good)}</p><p><span class="k">보완할 점</span>${esc(l.next)}</p></div>`:past?'<p class="muted" style="margin:10px 0 0">피드백은 곧 올라와요.</p>':''}</section>
+  <section class="card"><h2>이 수업에서 받은 과제 <small>${got.length}개</small></h2>${got.length?got.map(a=>item(a,true)).join(''):'<div class="empty">이 수업에서 받은 과제가 없어요.</div>'}</section>
+  ${due.length?`<section class="card"><h2>이 수업까지 해 올 과제 <small>${due.length}개</small></h2>${due.map(a=>item(a)).join('')}</section>`:''}`;
+}
+function item(a,inLesson){
+  const canCheck=a.type==='숙제평가'&&D(a.given)<=D(TODAY);
+  let act='';
+  if(a.status==='todo'&&canCheck) act=`<button class="check" data-done="${a.id}">완료 체크</button>`;
+  else if(a.status==='submitted') act=`<div class="doneat">✓ ${fmtAt(a.doneAt)} 완료${lateMark(a)} <button class="undo" data-undo="${a.id}">취소</button></div>`;
+  else if(a.status==='graded'&&a.doneAt) act=`<div class="doneat">✓ ${fmtAt(a.doneAt)} 완료${lateMark(a)}</div>`;
+  return `<div class="item"><div class="top"><span class="tag ${a.subj}">${a.subj}</span><span class="tag type">${a.type}</span>${stat(a)}</div>
+  <div class="t">${esc(a.title)}</div><div class="meta"><span>${esc(a.unit)}</span></div>
+  <div class="meta"><span>내준 날 ${mdw(a.given)}</span><span>마감 ${mdw(a.due)}</span></div>${act}</div>`;
+}
+function nextLesson(){
+  for(let i=0;i<14;i++){const day=add(TODAY,i), dw=D(day).getDay();
+    for(const s of SCHEDULE.filter(x=>x.dow===dw).sort((a,b)=>a.time.localeCompare(b.time))){
+      if(i===0&&s.time<=NOW_TIME)continue;
+      const l=LESSONS.find(x=>x.date===day&&x.subj===s.subj)||{};return {day,...s,...l};}}
+}
+
+function home(){
+  const n=nextLesson(), dd=n?diff(n.day,TODAY):0;
+  const todo=A.filter(a=>a.status==='todo'&&D(a.given)<=D(TODAY)&&(a.type==='숙제평가'||a.due>=TODAY)).sort((a,b)=>a.due.localeCompare(b.due));
+  const lastFb=LESSONS.find(l=>l.good);
+  return `<div class="head"><div class="sub">${mdw(TODAY)}</div><h1>${esc(ME.name)}님, 오늘도 반가워요</h1></div>${installCard()}
+  <section class="card"><h2>다음 수업</h2>${!n?'<div class="empty">예정된 수업이 없어요.</div>':`
+    <button class="next lbtn" data-slesson="${n.day}|${n.subj}"><div class="when"><b>${n.time}</b><span>${dd===0?'오늘':dd===1?'내일':mdw(n.day)}</span></div>
+    <div style="flex:1;text-align:left"><span class="tag ${n.subj}">${n.subj}</span><div style="font-weight:700;margin-top:4px">${esc(n.topic||'수업 내용 준비 중')}</div>
+    ${n.prep?`<div class="muted">준비: ${esc(n.prep)}</div>`:''}</div><span aria-hidden="true" style="color:var(--mute)">›</span></button>`}</section>
+  <section class="card"><h2>해야 할 과제 <small>${todo.length}개</small></h2>
+    ${todo.length?todo.slice(0,4).map(a=>item(a)).join(''):'<div class="empty">남은 과제가 없어요.</div>'}
+    <button class="more" data-go="homework">과제 캘린더 보기</button></section>
+  ${lastFb?`<section class="card"><h2>최근 수업 피드백 <small>${mdw(lastFb.date)} ${lastFb.subj}</small></h2>
+    <div class="fb" style="margin-top:0"><p><span class="k">잘한 점</span>${esc(lastFb.good)}</p><p><span class="k">보완할 점</span>${esc(lastFb.next)}</p></div></section>`:''}`;
+}
+
+function lesson(){
+  const today=SCHEDULE.filter(s=>s.dow===D(TODAY).getDay()).map(s=>({...s,...(LESSONS.find(l=>l.date===TODAY&&l.subj===s.subj)||{})}));
+  const mon=monday(TODAY);
+  const week=[...Array(7)].map((_,i)=>add(mon,i));
+  return `<div class="head"><h1>수업</h1><div class="sub">${['영어','수학'].map(s=>{const c=SCHEDULE.filter(x=>x.subj===s).length;return c?`${s} 주 ${c}회`:''}).filter(Boolean).join(' · ')||'등록된 수업이 없어요'}</div></div>
+  <section class="card"><h2>오늘의 수업 <small>${mdw(TODAY)}</small></h2>
+    ${today.length?today.map(t=>{return `<button class="next lbtn" data-slesson="${TODAY}|${t.subj}"><div class="when"><b>${t.time}</b><span>${t.subj}</span></div>
+      <div style="flex:1;text-align:left"><div style="font-weight:700">${esc(t.topic||'수업 내용 준비 중')}</div>${t.prep?`<div class="muted">준비: ${esc(t.prep)}</div>`:''}</div><span aria-hidden="true" style="color:var(--mute)">›</span></button>`}).join(''):'<div class="empty">오늘은 수업이 없어요.</div>'}</section>
+  <section class="card"><h2>주간 수업 일정 <small>${md(mon)} – ${md(add(mon,6))}</small></h2>
+    ${week.map(day=>{const ss=SCHEDULE.filter(s=>s.dow===D(day).getDay());
+      return `<div class="slot${day===TODAY?' now':''}"><div class="d">${mdw(day)}</div><div style="display:flex;gap:8px;flex-wrap:wrap">${ss.length?ss.map(s=>{const l=LESSONS.find(x=>x.date===day&&x.subj===s.subj);
+        return `<button class="lk2 chipl" data-slesson="${day}|${s.subj}"><span class="tag ${s.subj}">${s.subj}</span> <b style="font-size:14px">${s.time}</b>${l?` <span class="muted">${esc(l.topic)}</span>`:''} <span aria-hidden="true" style="color:var(--mute)">›</span></button>`}).join(''):'<span class="muted">수업 없음</span>'}</div></div>`}).join('')}</section>
+  <section class="card"><h2>수업 피드백</h2>
+    ${LESSONS.filter(l=>l.good).length?'':'<div class="empty">아직 피드백이 없어요.</div>'}${LESSONS.filter(l=>l.good).map(l=>`<div class="fb" style="border-color:var(--${l.subj==='영어'?'en':'ma'})">
+      <button class="lk2" data-slesson="${l.date}|${l.subj}"><span class="tag ${l.subj}">${l.subj}</span> <b style="font-size:14px">${mdw(l.date)}</b> <span class="muted">${esc(l.topic)}</span> ›</button>
+      <p><span class="k">잘한 점</span>${esc(l.good)}</p><p><span class="k">보완할 점</span>${esc(l.next)}</p></div>`).join('')}</section>`;
+}
+
+function dayCell(day,inMonth){
+  const due=A.filter(a=>a.due===day);
+  return `<button class="day${day===TODAY?' today':''}${inMonth===false?' out':''}" data-day="${day}" aria-pressed="${day===hwDate}">
+    <small>${inMonth===undefined?DOW[D(day).getDay()]:''}</small><b>${D(day).getDate()}</b>
+    <span class="dots">${due.map(a=>`<i class="dot ${a.subj}"></i>`).join('')}</span></button>`;
+}
+function homework(){
+  const seg=`<div class="seg" role="group" aria-label="보기">${[['day','일간'],['week','주간'],['month','월간']].map(([k,l])=>`<button data-hw="${k}" aria-pressed="${hwMode===k}">${l}</button>`).join('')}</div>`;
+  let body='';
+  const list=day=>{const xs=A.filter(a=>a.due===day);return xs.length?xs.map(a=>item(a)).join(''):'<div class="empty">이 날 마감인 과제가 없어요.</div>'};
+  if(hwMode==='day'){
+    body=`<section class="card"><div class="nav"><button data-step="-1" aria-label="이전 날">‹</button><b>${mdw(hwDate)}${hwDate===TODAY?' · 오늘':''}</b><button data-step="1" aria-label="다음 날">›</button></div>
+      <h2>이 날 마감 <small>마감일 기준</small></h2>${list(hwDate)}</section>`;
+  }else if(hwMode==='week'){
+    const mon=monday(hwDate), days=[...Array(7)].map((_,i)=>add(mon,i));
+    const xs=A.filter(a=>a.due>=mon&&a.due<=add(mon,6)).sort((a,b)=>a.due.localeCompare(b.due));
+    body=`<section class="card"><div class="nav"><button data-step="-7" aria-label="이전 주">‹</button><b>${md(mon)} – ${md(add(mon,6))}</b><button data-step="7" aria-label="다음 주">›</button></div>
+      <div class="week">${days.map(d=>dayCell(d)).join('')}</div></section>
+      <section class="card"><h2>이번 주 마감 <small>${xs.length}개</small></h2>${xs.length?xs.map(a=>item(a)).join(''):'<div class="empty">이 주에 마감인 과제가 없어요.</div>'}</section>`;
+  }else{
+    const d0=D(hwDate), first=S(new Date(d0.getFullYear(),d0.getMonth(),1)), start=monday(first);
+    const cells=[...Array(42)].map((_,i)=>add(start,i)).filter((d,i,arr)=>i<35||D(arr[35]).getMonth()===d0.getMonth());
+    body=`<section class="card"><div class="nav"><button data-month="-1" aria-label="이전 달">‹</button><b>${d0.getFullYear()}년 ${d0.getMonth()+1}월</b><button data-month="1" aria-label="다음 달">›</button></div>
+      <div class="dow">${['월','화','수','목','금','토','일'].map(x=>`<span>${x}</span>`).join('')}</div>
+      <div class="week">${cells.map(d=>dayCell(d,D(d).getMonth()===d0.getMonth())).join('')}</div>
+      <div class="legend"><span><i style="background:var(--en)"></i>영어</span><span><i style="background:var(--ma)"></i>수학</span><span>점 = 그날 마감 과제</span></div></section>
+      <section class="card"><h2>${mdw(hwDate)} 마감</h2>${list(hwDate)}</section>`;
+  }
+  const late=A.filter(a=>a.status==='todo'&&a.due<TODAY).length;
+  return `<div class="head"><h1>과제</h1><div class="sub">캘린더는 마감일 기준 · 숙제평가는 다 하면 완료 체크${late?` · <b style="color:var(--bad)">기한 지난 과제 ${late}개</b>`:''}</div></div>${seg}${body}`;
+}
+
+function lineChart(series,labels,{min=0,max=100,unit='%'}={}){
+  const W=600,H=230,L=40,R=14,T=20,B=30,n=labels.length;
+  const x=i=>L+(n<2?(W-L-R)/2:i/(n-1)*(W-L-R)), y=v=>T+(1-(v-min)/(max-min))*(H-T-B);
+  let g='';
+  for(let v=min;v<=max;v+=(max-min)/4) g+=`<line x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)"/><text x="${L-8}" y="${y(v)+4}" text-anchor="end" font-size="12" fill="var(--mute)">${v}${unit}</text>`;
+  labels.forEach((l,i)=>{if(n<=8||i%Math.ceil(n/8)===0)g+=`<text x="${x(i)}" y="${H-8}" text-anchor="middle" font-size="12" fill="var(--mute)">${esc(l)}</text>`});
+  series.forEach(s=>{const pts=s.values.map((v,i)=>v==null?null:[x(i),y(v),v]).filter(Boolean);
+    g+=`<polyline points="${pts.map(p=>p[0]+','+p[1]).join(' ')}" fill="none" stroke="${s.color}" stroke-width="2.5" stroke-linejoin="round"${s.dash?' stroke-dasharray="5 5"':''}/>`;
+    pts.forEach(p=>{g+=`<circle cx="${p[0]}" cy="${p[1]}" r="4" fill="var(--card)" stroke="${s.color}" stroke-width="2"/>`;if(s.labels)g+=`<text x="${p[0]}" y="${p[1]-9}" text-anchor="middle" font-size="11" font-weight="700" fill="var(--ink)">${p[2]}</text>`});});
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="추이 그래프">${g}</svg>`;
+}
+
+function borine(){
+  const subs=['영어','수학'].filter(s=>gSubs[s]);
+  const pick=a=>subs.includes(a.subj);
+  let start=null,end=null,pStart=null,pEnd=null,label='전체 기간',pLabel='';
+  if(gPer==='주간'){start=monday(rDate);end=add(start,6);pStart=add(start,-7);pEnd=add(start,-1);label=`${mdw(start)} – ${mdw(end)}`;pLabel='지난주'}
+  if(gPer==='월간'){const d=D(rDate);start=S(new Date(d.getFullYear(),d.getMonth(),1));end=S(new Date(d.getFullYear(),d.getMonth()+1,0));
+    pStart=S(new Date(d.getFullYear(),d.getMonth()-1,1));pEnd=add(start,-1);label=`${d.getFullYear()}년 ${d.getMonth()+1}월`;pLabel='지난달'}
+  const inR=(a,s0,e0)=>s0==null||(a.due>=s0&&a.due<=e0);
+  const graded=(s0,e0)=>A.filter(a=>a.status==='graded'&&a.correct!=null&&pick(a)&&inR(a,s0,e0)).sort((a,b)=>a.due.localeCompare(b.due));
+  const avgR=xs=>xs.length?Math.round(xs.reduce((x,a)=>x+rate(a),0)/xs.length*10)/10:null;
+  const g=graded(start,end), prev=gPer==='전체'?[]:graded(pStart,pEnd), avg=avgR(g), pAvg=avgR(prev);
+  const hw=A.filter(a=>a.type==='숙제평가'&&pick(a)&&inR(a,start,end)&&a.due<=TODAY), hwDone=hw.filter(a=>a.status!=='todo'), onTime=hwDone.filter(a=>a.doneAt&&a.doneAt.slice(0,10)<=a.due);
+  const pct=(a,b)=>b?Math.round(a/b*100)+'%':'-';
+  const delta=(v,p)=>v==null||p==null?'':`<span class="dl ${v-p>=0?'up':'down'}">${v-p>=0?'▲':'▼'} ${Math.abs(v-p).toFixed(1)}%p</span>`;
+  const bySubj=subs.map(s=>{const xs=g.filter(a=>a.subj===s),ps=prev.filter(a=>a.subj===s);return {s,v:avgR(xs),p:avgR(ps),n:xs.length}});
+  const byType=TYPES.map(t=>{const xs=g.filter(a=>a.type===t);return [t,avgR(xs),xs.length]}).filter(x=>x[2]);
+  const strong=g.filter(a=>rate(a)>=80).sort((a,b)=>rate(b)-rate(a)), weak=g.filter(a=>rate(a)<=50).sort((a,b)=>rate(a)-rate(b));
+  const units=g.filter(a=>a.type==='단원평가'&&a.nat!=null);
+  const col=s=>`var(--${s==='영어'?'en':'ma'})`;
+  // 총평
+  const notes=[];
+  if(avg!=null)notes.push(`${gPer==='전체'?'지금까지':gPer==='주간'?(start===monday(TODAY)?'이번 주':'이 주'):(start.slice(0,7)===TODAY.slice(0,7)?'이번 달':'이 달')} 평균 정답률은 ${avg}%${pAvg!=null?`로 ${pLabel}보다 ${Math.abs(avg-pAvg).toFixed(1)}%p ${avg>=pAvg?'올랐어요':'내렸어요'}`:'예요'}.`);
+  if(bySubj.length===2&&bySubj.every(x=>x.v!=null)){const[h,l]=[...bySubj].sort((a,b)=>b.v-a.v);if(h.v-l.v>=5)notes.push(`${h.s}(${h.v}%)가 ${l.s}(${l.v}%)보다 강해요.`)}
+  if(strong[0])notes.push(`가장 잘한 단원은 ${strong[0].unit}(${rate(strong[0])}%)이에요.`);
+  if(weak.length)notes.push(`${weak.map(a=>a.unit).slice(0,2).join(', ')}은(는) 다시 볼 필요가 있어요.`);
+  if(hw.length&&hwDone.length<hw.length)notes.push(`숙제평가 ${hw.length-hwDone.length}개를 아직 완료하지 않았어요.`);
+  else if(hw.length)notes.push(`숙제평가는 모두 완료했어요${onTime.length===hwDone.length?', 마감도 다 지켰어요':''}.`);
+  return `<div class="seg" role="group" aria-label="기간">${['전체','주간','월간'].map(k=>`<button data-gper="${k}" aria-pressed="${gPer===k}">${k}</button>`).join('')}</div>
+  <div class="chips">${['영어','수학'].map(s=>`<button class="chip sub ${s}" data-gsub="${s}" aria-pressed="${!!gSubs[s]}">${s}</button>`).join('')}</div>
+  ${gPer!=='전체'?`<div class="nav card" style="padding:8px"><button data-rstep="-1" aria-label="이전">‹</button><b>${label}</b><button data-rstep="1" aria-label="다음">›</button></div>`:''}
+  <section class="card"><h2>성취도 분석 리포트 <small>${label}</small></h2>
+    ${g.length?`<div class="bigrate"><b>${avg}%</b><span>평균 정답률 ${delta(avg,pAvg)}</span></div>`:`<div class="empty" style="padding:12px 0">이 기간에 채점된 과제가 없어요.</div>`}
+    <div class="stats" style="margin-top:12px"><div class="stat"><b>${g.length}건</b><span>채점 완료</span></div>
+      <div class="stat"><b>${pct(hwDone.length,hw.length)}</b><span>숙제평가 완료율</span></div><div class="stat"><b>${pct(onTime.length,hwDone.length)}</b><span>마감 지킴률</span></div></div>
+    ${notes.length?`<div class="note"><b>총평</b><p>${esc(notes.join(' '))}</p></div>`:''}</section>
+  ${g.length&&subs.length>1?`<section class="card"><h2>과목별 <small>${pLabel?pLabel+' 대비':''}</small></h2>
+    ${bySubj.map(x=>`<div class="sbar"><span class="tag ${x.s}">${x.s}</span><div class="track"><i style="width:${x.v??0}%;background:${col(x.s)}"></i></div><b>${x.v!=null?x.v+'%':'-'}</b>${delta(x.v,x.p)}</div>`).join('')}</section>`:''}
+  ${byType.length?`<section class="card"><h2>평가 종류별 정답률</h2>${byType.map(([t,v,n])=>`<div class="sbar"><span class="tag type">${t}</span><div class="track"><i style="width:${v}%"></i></div><b>${v}%</b><span class="muted" style="font-size:12px">${n}건</span></div>`).join('')}</section>`:''}
+  ${g.length>1?`<section class="card"><h2>정답률 추이 <small>마감일 순</small></h2>${lineChart(subs.map(s=>({color:col(s),labels:true,values:g.map(a=>a.subj===s?rate(a):null)})),g.map(a=>md(a.due)))}
+    <div class="legend">${subs.map(s=>`<span><i style="background:${col(s)}"></i>${s}</span>`).join('')}</div></section>`:''}
+  ${g.length?`<section class="card"><h2>잘한 단원 <small>정답률 80% 이상</small></h2>${strong.length?strong.map(a=>`<div class="weak"><span class="tag ${a.subj}">${a.subj}</span><span><b>${esc(a.unit)}</b><div class="muted" style="font-size:12px">${a.type} · ${esc(a.title)}</div></span><span class="n" style="color:var(--ok)">${rate(a)}%</span></div>`).join(''):'<div class="empty" style="padding:10px 0">아직 없어요.</div>'}</section>
+  <section class="card"><h2>보충 필요 항목 <small>정답률 50% 이하</small></h2>${weak.length?weak.map(a=>`<div class="weak"><span class="tag ${a.subj}">${a.subj}</span><span><b>${esc(a.unit)}</b><div class="muted" style="font-size:12px">${a.type} · ${esc(a.title)} · 마감 ${md(a.due)}</div></span><span class="n">${rate(a)}%</span></div>`).join(''):'<div class="empty" style="padding:10px 0">정답률 50% 이하인 과제가 없어요.</div>'}</section>`:''}
+  ${units.length?`<section class="card"><h2>단원평가 <small>나 · 경남 · 전국 평균</small></h2>
+    ${units.map(a=>`<div style="margin-top:12px"><div><span class="tag ${a.subj}">${a.subj}</span> <b>${esc(a.title)}</b> <span class="muted">${md(a.due)}</span></div>
+      <div class="cmp"><span>나</span><div class="b me" style="width:${a.score/a.max*100}%"></div><span class="v">${a.score}</span>
+      <span>경남</span><div class="b" style="width:${(a.gn??0)/a.max*100}%"></div><span class="v">${a.gn??'-'}</span>
+      <span>전국</span><div class="b" style="width:${a.nat/a.max*100}%"></div><span class="v">${a.nat}</span></div>
+      <div class="muted" style="margin-top:4px">전국 평균보다 ${Math.abs(a.score-a.nat).toFixed(1)}점 ${a.score>=a.nat?'높아요':'낮아요'}</div></div>`).join('')}</section>`:''}`;
+}
+
+function school(){
+  if(!TERMS.length) return '<section class="card"><div class="empty">아직 학교 성적이 없어요. 선생님이 입력하면 여기에 보여요.</div></section>';
+  const avgOf=r=>{const v=[r.mid,r.fin].filter(x=>x!=null);return v.length?Math.round(v.reduce((a,b)=>a+b,0)/v.length*10)/10:null};
+  const pctOf=r=>r.rank&&r.n?Math.round(r.rank/r.n*1000)/10:null;
+  const rows=SCHOOL.filter(r=>r.term===term), subs=['영어','수학'].filter(s=>SCHOOL.some(r=>r.subj===s));
+  const col=s=>`var(--${s==='영어'?'en':'ma'})`;
+  const series=subs.flatMap(s=>[
+    {subj:s,color:col(s),labels:true,values:TERMS.map(t=>avgOf(SCHOOL.find(x=>x.term===t&&x.subj===s)||{}))},
+    {subj:s,color:col(s),dash:true,values:TERMS.map(t=>SCHOOL.find(x=>x.term===t&&x.subj===s)?.avg??null)}]);
+  const card=r=>{const me=avgOf(r), d=me!=null&&r.avg!=null?me-r.avg:null, p=pctOf(r);
+    return `<section class="card"><div class="rowtop"><h2 style="margin:0">${sTag(r.subj)} ${term}</h2>
+      <span class="lv${r.lv?'':' none'}">${r.lv?esc(r.lv)+(/^\d$/.test(r.lv)?'등급':''):'등급 미정'}</span></div>
+      <div class="stats" style="margin-top:12px"><div class="stat"><b>${r.mid??'–'}</b><span>중간고사</span></div><div class="stat"><b>${r.fin??'–'}</b><span>기말고사</span></div><div class="stat"><b>${me??'–'}</b><span>내 평균</span></div></div>
+      ${r.avg!=null&&me!=null?`<div class="cmp" style="grid-template-columns:64px 1fr 48px;margin-top:12px"><span>내 평균</span><div class="b" style="width:${me}%;background:${col(r.subj)}"></div><span class="v">${me}</span>
+        <span>학교 평균</span><div class="b" style="width:${r.avg}%"></div><span class="v">${r.avg}</span></div>
+        <p class="muted" style="margin:6px 0 0">학교 평균보다 <b style="color:var(--ink)">${Math.abs(d).toFixed(1)}점 ${d>=0?'높아요':'낮아요'}</b></p>`:''}
+      <div class="row" style="border:0;padding-bottom:0"><span>석차</span><b>${r.rank&&r.n?`${r.rank} / ${r.n}명 <span class="muted">(상위 ${p}%)</span>`:r.n?`– / ${r.n}명`:'–'}</b></div>
+      ${r.mid==null||r.fin==null?'<p class="muted" style="margin:4px 0 0">아직 안 본 시험이 있어요. 평균은 입력된 시험만으로 계산했어요.</p>':''}</section>`};
+  const analysis=subs.map(s=>{const rs=TERMS.map(t=>SCHOOL.find(x=>x.term===t&&x.subj===s)).filter(Boolean);
+    if(rs.length<2)return `<li>${sTag(s)} 비교할 학기가 아직 하나뿐이에요.</li>`;
+    const [a,b]=rs.slice(-2), ma=avgOf(a), mb=avgOf(b), out=[];
+    if(ma!=null&&mb!=null)out.push(`평균 ${ma} → ${mb} (${mb-ma>=0?'+':''}${(mb-ma).toFixed(1)}점)`);
+    if(ma!=null&&mb!=null&&a.avg!=null&&b.avg!=null){const ga=ma-a.avg,gb=mb-b.avg;out.push(`학교 평균과의 차이 ${ga>=0?'+':''}${ga.toFixed(1)} → ${gb>=0?'+':''}${gb.toFixed(1)}`)}
+    if(a.lv&&b.lv)out.push(`등급 ${esc(a.lv)} → ${esc(b.lv)}`);
+    if(pctOf(a)!=null&&pctOf(b)!=null)out.push(`석차 상위 ${pctOf(a)}% → ${pctOf(b)}%`);
+    return `<li>${sTag(s)} <b>${a.term} → ${b.term}</b><div class="muted" style="margin-top:2px">${out.join(' · ')||'비교할 값이 없어요.'}</div></li>`}).join('');
+  const vals=series.flatMap(x=>x.values).filter(v=>v!=null), lo=Math.max(0,Math.floor((Math.min(...vals)-5)/20)*20);
+  return `<div class="chips">${TERMS.map(t=>`<button class="chip" data-term="${t}" aria-pressed="${term===t}">${t}</button>`).join('')}</div>
+  ${rows.map(card).join('')}
+  <section class="card"><h2>학기별 추이 <small>학기 평균</small></h2>${lineChart(series,TERMS,{min:lo,max:100,unit:''})}
+    <div class="legend">${subs.map(s=>`<span><i style="background:${col(s)}"></i>${s}</span>`).join('')}<span>실선: 내 평균 · 점선: 학교 평균</span></div></section>
+  <section class="card"><h2>변화 분석 <small>직전 학기 대비</small></h2><ul style="margin:0;padding-left:0;list-style:none;display:grid;gap:10px;font-size:15px">${analysis}</ul></section>`;
+}
+
+function grades(){
+  return `<div class="head"><h1>성적</h1></div>
+  <div class="seg" role="group" aria-label="성적 종류">${[['borine','보리네 성적'],['school','학교 성적']].map(([k,l])=>`<button data-g="${k}" aria-pressed="${gTab===k}">${l}</button>`).join('')}</div>
+  ${gTab==='borine'?borine():school()}`;
+}
+
+function my(){
+  return `<div class="head"><h1>MY</h1></div>
+  <section class="card"><div style="font-size:22px;font-weight:900">${esc(ME.name)}</div><div class="muted">${esc(ME.school)} · ${esc(ME.grade)}</div></section>
+  <section class="card">
+    <div class="row"><span>담당</span><b>${esc(ME.teacher)}</b></div>
+    <div class="row"><span>수업</span><b>${SCHEDULE.map(s=>DOW[s.dow]+' '+s.subj).join(' · ')}</b></div>
+    <div class="row"><span>비밀번호</span><b class="muted">숫자 네 자리 · 선생님이 바꿔 줘요</b></div>
+    </section><button class="more" data-logout="1" style="background:var(--card)">${preview?'선생님 화면으로 돌아가기':'로그아웃'}</button>`;
+}
+
+// ===== 선생님 화면 =====
+const sTag=s=>`<span class="tag ${s}">${s}</span>`;
+const nowHM=()=>{const n=new Date();return `${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}`};
+function occurrences(day){
+  const dw=D(day).getDay();
+  return ALL_SCHEDULE.filter(s=>s.dow===dw&&stu(s.sid)).sort((a,b)=>a.time.localeCompare(b.time)||a.sid-b.sid);
+}
+function lessonOf(sid,date,subj){return ALL_LESSONS.find(l=>l.sid===sid&&l.date===date&&l.subj===subj)}
+function missingFeedback(){
+  const out=[];
+  for(let i=0;i<7;i++){const day=add(TODAY,-i);
+    occurrences(day).forEach(o=>{if(i===0&&o.time>NOW_TIME)return;const l=lessonOf(o.sid,day,o.subj);if(!l||!l.good)out.push({...o,day})})}
+  return out;
+}
+function waitingOf(a){return Object.values(RESULTS[a.id]||{}).filter(r=>r.status==='submitted'||(r.status==='todo'&&a.type!=='숙제평가'&&a.due<=TODAY)).length}
+
+function tToday(){
+  const occ=occurrences(TODAY), groups={};
+  occ.forEach(o=>{const k=o.time+' '+o.subj;(groups[k]=groups[k]||{time:o.time,subj:o.subj,ids:[]}).ids.push(o.sid)});
+  const grading=ASSIGN.map(a=>({a,n:waitingOf(a)})).filter(x=>x.n).sort((x,y)=>x.a.due.localeCompare(y.a.due));
+  const late=[];ASSIGN.forEach(a=>Object.entries(RESULTS[a.id]||{}).forEach(([sid,r])=>{if(r.status==='todo'&&a.type==='숙제평가'&&a.due<TODAY&&stu(+sid))late.push({a,s:stu(+sid)})}));
+  const miss=missingFeedback();
+  return `<div class="head" style="display:flex;justify-content:space-between;align-items:flex-end;gap:8px"><div><div class="sub">${mdw(TODAY)} · ${esc(TEACHER.name)}</div><h1>오늘 할 일</h1></div><button class="btn sm ghost" data-logout="1">로그아웃</button></div>${installCard()}
+  <section class="card"><div class="stats">
+    <div class="stat"><b>${occ.length}</b><span>오늘 수업</span></div>
+    <div class="stat"><b>${grading.reduce((s,x)=>s+x.n,0)}</b><span>채점 대기</span></div>
+    <div class="stat"><b>${miss.length}</b><span>피드백 미작성</span></div></div></section>
+  <section class="card"><h2>오늘 수업</h2>
+    ${Object.values(groups).length?Object.values(groups).map(g=>`<div class="srow"><div><b>${g.time}</b> ${sTag(g.subj)}</div>
+      <div class="acts">${g.ids.map(i=>`<button class="btn sm ghost" data-open="${lkey(i,TODAY,g.subj)}">${esc(stu(i).name)}</button>`).join('')}</div></div>`).join(''):'<div class="empty">오늘은 수업이 없어요.</div>'}</section>
+  <section class="card private"><h2>🔒 오늘까지 할 일 <small>선생님만</small></h2>
+    ${TODOS.filter(t=>!t.done&&(!t.due||t.due<=TODAY)).sort((a,b)=>(a.due||'9').localeCompare(b.due||'9')).map(t=>todoRow(t,true)).join('')||'<div class="empty">오늘까지 할 일은 다 했어요.</div>'}
+    <button class="more" data-ttab="todos">할일 전체 보기 · 추가</button></section>
+  <section class="card"><h2>채점할 것</h2>
+    ${grading.length?grading.map(x=>`<div class="srow"><div>${sTag(x.a.subj)} <span class="tag type">${x.a.type}</span> <b>${esc(x.a.title)}</b><div class="muted">마감 ${mdw(x.a.due)} · 채점 대기 ${x.n}명</div></div>
+      <button class="btn sm" data-grade="${x.a.id}">채점</button></div>`).join(''):'<div class="empty">채점할 과제가 없어요.</div>'}</section>
+  <section class="card"><h2>마감 지난 미완료 숙제평가</h2>
+    ${late.length?late.map(x=>`<button class="lrow" data-grade="${x.a.id}" data-hl="${x.s.id}"><span style="flex:1;text-align:left"><b>${esc(x.s.name)}</b> · ${esc(x.a.title)}<span style="display:block;font-size:13px;color:var(--mute)">마감 ${mdw(x.a.due)}</span></span><span class="st late">${-diff(x.a.due,TODAY)}일 지남</span><span aria-hidden="true" style="color:var(--mute)">›</span></button>`).join(''):'<div class="empty">없어요.</div>'}</section>
+  <section class="card"><h2>피드백 미작성 <small>최근 7일</small></h2>
+    ${miss.length?miss.slice(0,8).map(m=>`<div class="srow"><div><b>${esc(stu(m.sid).name)}</b> ${sTag(m.subj)}<div class="muted">${mdw(m.day)} ${m.time}</div></div><button class="btn sm ghost" data-open="${lkey(m.sid,m.day,m.subj)}">작성</button></div>`).join('')+(miss.length>8?`<p class="muted">외 ${miss.length-8}건</p>`:''):'<div class="empty">모두 작성했어요.</div>'}</section>`;
+}
+
+function tStudents(){
+  return `<div class="head"><h1>학생</h1><div class="sub">${STUDENTS.length}명 · 학생을 누르면 수업·과제·할일</div></div>
+  <section class="card"><h2>학생 목록</h2>    ${STUDENTS.map(s=>{const td=TODOS.filter(t=>t.sid===s.id&&!t.done).length, nx=(()=>{for(let i=0;i<8;i++){const d=add(TODAY,i);const o=ALL_SCHEDULE.filter(x=>x.sid===s.id&&x.dow===D(d).getDay()&&!(i===0&&x.time<=NOW_TIME)).sort((a,b)=>a.time.localeCompare(b.time))[0];if(o)return {d,...o}}})();
+      return `<button class="lrow" data-sdetail="${s.id}"><span style="flex:1;text-align:left"><b>${esc(s.name)}</b> <span class="muted">${esc(s.grade)}</span>
+      <span style="display:block;font-size:13px;color:var(--mute)">${s.subjects.join('·')}${nx?` · 다음 수업 ${mdw(nx.d)} ${nx.time} ${nx.subj}`:''}</span></span>
+      <span class="badges">${td?`<i class="b todo">할일 ${td}</i>`:''}</span><span aria-hidden="true" style="color:var(--mute)">›</span></button>`}).join('')}</section>
+  <details class="card"><summary><b>학생 등록</b></summary><div style="margin-top:12px">
+    <form id="stuForm" class="form">
+      <label>이름<input name="name" required></label><label>학교<input name="school"></label>
+      <label>학년<input name="grade" placeholder="중2"></label>
+      <label>로그인 번호 (4자리)<input name="pin" inputmode="numeric" pattern="\\d{4}" maxlength="4" required></label>
+      <div class="full fl">듣는 과목<div class="checks"><label><input type="checkbox" name="subj" value="영어" checked> 영어</label><label><input type="checkbox" name="subj" value="수학"> 수학</label></div></div>
+      <button class="btn full">등록</button></form>
+  </div></details>`;
+}
+
+function tLessons(){
+  const seg=`<div class="seg">${[['log','수업 기록·피드백'],['sched','정규 시간표']].map(([k,l])=>`<button data-lmode="${k}" aria-pressed="${lMode===k}">${l}</button>`).join('')}</div>`;
+  if(lMode==='sched'){
+    const rows=[...ALL_SCHEDULE].filter(s=>stu(s.sid)).sort((a,b)=>((a.dow+6)%7)-((b.dow+6)%7)||a.time.localeCompare(b.time));
+    return `<div class="head"><h1>수업</h1></div>${seg}
+    <section class="card"><h2>시간표 추가</h2><form id="schedForm" class="form">
+      <label>학생<select name="sid">${STUDENTS.map(s=>`<option value="${s.id}">${esc(s.name)}</option>`).join('')}</select></label>
+      <label>요일<select name="dow">${[1,2,3,4,5,6,0].map(d=>`<option value="${d}">${DOW[d]}</option>`).join('')}</select></label>
+      <label>시간<input name="time" type="time" value="18:00" required></label>
+      <label>과목<select name="subj"><option>영어</option><option>수학</option></select></label>
+      <button class="btn full">추가</button></form></section>
+    <section class="card"><h2>정규 시간표 <small>매주 반복</small></h2><table><thead><tr><th>요일</th><th>시간</th><th>과목</th><th>학생</th><th></th></tr></thead><tbody>
+      ${rows.map(r=>`<tr><td><b>${DOW[r.dow]}</b></td><td>${r.time}</td><td>${sTag(r.subj)}</td><td>${esc(stu(r.sid).name)}</td><td class="num"><button class="btn sm danger" data-delsched="${r.id}" aria-label="삭제">×</button></td></tr>`).join('')}</tbody></table></section>`;
+  }
+  const occ=occurrences(logDate);
+  return `<div class="head"><h1>수업</h1></div>${seg}
+  <section class="card"><div class="nav"><button data-lstep="-1" aria-label="이전 날">‹</button><b>${mdw(logDate)}${logDate===TODAY?' · 오늘':''}</b><button data-lstep="1" aria-label="다음 날">›</button></div>
+    ${occ.length?'<p class="muted" style="margin:0">수업을 누르면 기록·과제·할일을 입력해요.</p>':'<div class="empty">이 날은 수업이 없어요.</div>'}</section>
+  ${occ.length?`<section class="card">${occ.map(o=>{const l=lessonOf(o.sid,logDate,o.subj)||{},td=todosOf(o.sid,logDate,o.subj).filter(t=>!t.done).length;
+    return `<button class="lrow" data-open="${lkey(o.sid,logDate,o.subj)}"><span class="d">${o.time}</span><span style="flex:1;text-align:left"><b>${esc(stu(o.sid).name)}</b> ${sTag(o.subj)} <span class="muted">${esc(l.topic||'')}</span></span>
+      <span class="badges">${l.good?'<i class="b ok">피드백 ✓</i>':''}${td?`<i class="b todo">할일 ${td}</i>`:''}</span></button>`}).join('')}</section>`:''}`;
+}
+
+function tWork(){
+  if(gradeId!=null) return tGrade(ASSIGN.find(a=>a.id===gradeId));
+  const seg=`<div class="seg">${[['list','과제 목록'],['new','새 과제']].map(([k,l])=>`<button data-hwv="${k}" aria-pressed="${hwView===k}">${l}</button>`).join('')}</div>`;
+  if(hwView==='new') return `<div class="head"><h1>과제·채점</h1></div>${seg}
+  <section class="card"><h2>새 과제 내기</h2><form id="hwForm" class="form">
+    <label>과목<select name="subj" id="hwSubj"><option>영어</option><option>수학</option></select></label>
+    <label>종류<select name="type" id="hwType">${TYPES.map(t=>`<option>${t}</option>`).join('')}</select></label>
+    <label class="full">제목<input name="title" required placeholder="관계대명사 워크북 2"></label>
+    <label class="full">단원·목차 <span style="font-weight:400">(정답률 50% 이하면 보충 필요로 표시)</span><input name="unit" required placeholder="Lesson 6 관계대명사 what"></label>
+    <label>내준 날<input name="given" type="date" value="${TODAY}" required></label>
+    <label>마감일<input name="due" type="date" value="${add(TODAY,3)}" required></label>
+    <label>문항 수<input name="total" type="number" min="1" value="20" required></label>
+    <div class="full form" id="unitOnly" style="display:none">
+      <label>만점<input name="max" type="number" min="1" value="100"></label>
+      <label>전국 평균<input name="nat" type="number" step="0.1" placeholder="채점 때 입력 가능"></label>
+      <label>경남 평균<input name="gn" type="number" step="0.1" placeholder="채점 때 입력 가능"></label></div>
+    <div class="full fl">대상 학생<div class="checks" id="hwTargets">${STUDENTS.map(s=>`<label><input type="checkbox" name="t" value="${s.id}"${s.subjects.includes('영어')?' checked':''}> ${esc(s.name)}</label>`).join('')}</div></div>
+    <button class="btn full">과제 내기</button></form></section>`;
+  const list=[...ASSIGN].sort((a,b)=>b.due.localeCompare(a.due));
+  return `<div class="head"><h1>과제·채점</h1></div>${seg}
+  ${list.map(a=>{const rs=Object.entries(RESULTS[a.id]||{}).filter(([sid])=>stu(+sid)).map(x=>x[1]);
+    const done=rs.filter(r=>r.status!=='todo').length, gr=rs.filter(r=>r.status==='graded').length, w=waitingOf(a);
+    return `<div class="item" style="background:var(--card)"><div class="top">${sTag(a.subj)}<span class="tag type">${a.type}</span>${w?`<span class="st soon">채점 대기 ${w}</span>`:''}</div>
+      <div class="t">${esc(a.title)}</div><div class="meta"><span>${esc(a.unit)}</span></div>
+      <div class="meta"><span>내준 날 ${mdw(a.given)}</span><span>마감 ${mdw(a.due)}</span><span>대상 ${rs.length} · 완료 ${done} · 채점 ${gr}</span></div>
+      <div class="acts" style="margin-top:6px"><button class="btn sm" data-grade="${a.id}">채점표</button><button class="btn sm danger" data-delhw="${a.id}">${armed==='h'+a.id?'정말 삭제':'삭제'}</button></div></div>`}).join('')}`;
+}
+
+function tGrade(a){
+  const rs=Object.entries(RESULTS[a.id]||{}).filter(([sid])=>stu(+sid));
+  const unit=a.type==='단원평가';
+  const bl=gradeBack?.kind==='detail'?`${esc(stu(gradeBack.sid)?.name||'')} 페이지`:gradeBack?.kind==='lesson'?'수업 페이지':gradeBack?.kind==='today'?'오늘':'과제 목록';
+  return `<div class="head"><button class="undo" data-ungrade="1" style="padding:0">← ${bl}</button><h1>${esc(a.title)}</h1>
+    <div class="sub">${a.subj} · ${a.type} · ${esc(a.unit)} · 마감 ${mdw(a.due)} · ${a.total}문항</div></div>
+  <form id="gradeForm" data-id="${a.id}">
+  ${unit?`<section class="card"><h2>단원평가 평균</h2><div class="form">
+    <label>전국 평균<input name="nat" type="number" step="0.1" value="${a.nat??''}"></label>
+    <label>경남 평균<input name="gn" type="number" step="0.1" value="${a.gn??''}"></label>
+    <label>만점<input value="${a.max}" disabled></label></div></section>`:''}
+  <section class="card"><h2>채점표 <small>맞은 문항 수 입력 → 정답률 자동</small></h2>
+    <div class="scroll"><table><thead><tr><th>학생</th><th>상태</th><th class="num">맞은 수</th>${unit?'<th class="num">점수</th>':''}<th class="num">정답률</th></tr></thead><tbody>
+    ${rs.map(([sid,r])=>{const s=stu(+sid), rt=r.correct!=null?Math.round(r.correct/a.total*1000)/10:null;
+      const st=r.status==='graded'?'<span class="st done">채점됨</span>':r.status==='submitted'?`<span class="st done">완료 ${fmtAt(r.doneAt)}</span>`:(a.type==='숙제평가'&&a.due<TODAY?'<span class="st late">미완료</span>':'<span class="muted">-</span>');
+      return `<tr${+sid===gradeHl?' class="hl" id="hlrow"':''}><td><b>${esc(s.name)}</b></td><td>${st}</td>
+        <td class="num"><input class="gin" name="c_${sid}" data-total="${a.total}" data-r="r_${sid}" type="number" min="0" max="${a.total}" inputmode="numeric" value="${r.correct??''}" aria-label="${esc(s.name)} 맞은 수"> / ${a.total}</td>
+        ${unit?`<td class="num"><input class="gin" name="s_${sid}" type="number" min="0" max="${a.max}" step="0.1" value="${r.score??''}" aria-label="${esc(s.name)} 점수"></td>`:''}
+        <td class="num" id="r_${sid}"${rt!=null&&rt<=50?' style="color:var(--bad);font-weight:700"':''}>${rt!=null?rt+'%':'-'}</td></tr>`}).join('')}
+    </tbody></table></div>
+    <p class="muted">빈칸은 채점하지 않은 걸로 둬요. 정답률 50% 이하는 학생 화면 "보충 필요 항목"에 자동으로 떠요.</p>
+    <button class="btn" style="width:100%">채점 저장</button></section></form>`;
+}
+
+function tSchool(){
+  const rows=ALL_SCHOOL.filter(r=>r.sid===schoolSid).sort((a,b)=>TERM_ORDER.indexOf(a.term)-TERM_ORDER.indexOf(b.term)||a.subj.localeCompare(b.subj));
+  const v=x=>x??'';
+  return `<div class="head"><h1>학교 성적</h1><div class="sub">선생님만 입력 · 학생은 보기만 해요</div></div>
+  <section class="card"><label class="fl">학생<select id="schoolSid">${STUDENTS.map(s=>`<option value="${s.id}"${s.id===schoolSid?' selected':''}>${esc(s.name)} (${esc(s.grade)})</option>`).join('')}</select></label></section>
+  <section class="card"><h2>점수 기록 <small>같은 학기·과목은 덮어써요</small></h2><form id="schoolForm" class="form">
+    <label>학기<select name="term">${TERM_ORDER.map(t=>`<option${t===(rows.at(-1)?.term||'중1-1')?' selected':''}>${t}</option>`).join('')}</select></label>
+    <label>과목<select name="subj"><option>영어</option><option>수학</option></select></label>
+    <label>중간고사<input name="mid" type="number" min="0" max="100" step="0.1"></label>
+    <label>기말고사<input name="fin" type="number" min="0" max="100" step="0.1"></label>
+    <label>과목 학교 평균<input name="avg" type="number" min="0" max="100" step="0.1"></label>
+    <label>등급 / 성취도<input name="lv" maxlength="3" placeholder="A 또는 2"></label>
+    <label>석차<input name="rank" type="number" min="1" placeholder="21"></label>
+    <label>수강자 수<input name="n" type="number" min="1" placeholder="212"></label>
+    <button class="btn full">저장</button></form>
+    <p class="muted" style="margin:8px 0 0">빈칸은 비워 둬도 돼요. 중학교는 석차 없이 성취도(A~E)만, 고등학교는 석차등급과 석차를 넣으면 돼요.</p></section>
+  <section class="card"><h2>${esc(stu(schoolSid)?.name||'')} 기록 <small>줄을 누르면 수정</small></h2>
+    ${rows.length?rows.map(r=>`<div class="srow"><button class="glink" style="flex:1;text-align:left;white-space:normal" data-editschool="${r.term}|${r.subj}">
+      <b>${r.term}</b> ${sTag(r.subj)} <span class="muted">중간 ${v(r.mid)||'–'} · 기말 ${v(r.fin)||'–'} · 학교평균 ${v(r.avg)||'–'} · 등급 ${esc(r.lv)||'–'} · 석차 ${r.rank?r.rank+'/'+(r.n||'?'):'–'}</span></button>
+      <button class="btn sm danger" data-delschool="${r.sid}|${r.term}|${r.subj}" aria-label="삭제">×</button></div>`).join(''):'<div class="empty">아직 기록이 없어요.</div>'}
+    <button class="more" data-preview="${schoolSid}" data-pg="school">이 학생 화면에서 보기</button></section>`;
+}
+// ===== 학생별 페이지 · 수업 페이지 · 내 할일 (선생님 전용) =====
+let TODOS=[];
+let stuDetail=null, lessonCtx=null, backTo=null, gradeHl=null, gradeBack=null;
+const timeOf=(sid,date,subj)=>(ALL_SCHEDULE.find(s=>s.sid===sid&&s.subj===subj&&s.dow===D(date).getDay())||{}).time||'';
+const lkey=(sid,date,subj)=>`${sid}|${date}|${subj}`;
+const todosOf=(sid,date,subj)=>TODOS.filter(t=>t.sid===sid&&t.date===date&&t.subj===subj);
+function todoRow(t,showLesson){
+  const s=stu(t.sid), overdue=!t.done&&t.due&&t.due<TODAY;
+  return `<div class="todo${t.done?' done':''}"><button class="tick" data-todo="${t.id}" aria-pressed="${t.done}" aria-label="${t.done?'완료 취소':'완료'}">${t.done?'✓':''}</button>
+    <div style="flex:1"><div class="tt">${t.subj&&!s?sTag(t.subj)+' ':''}${esc(t.text)}</div><div class="muted" style="font-size:12px">${showLesson&&s&&t.date?`<a class="lk" data-open="${lkey(t.sid,t.date,t.subj)}">${esc(s.name)} ${t.subj} ${md(t.date)} 수업</a> · `:showLesson&&s?`<a class="lk" data-sdetail="${s.id}">${esc(s.name)}</a>${t.subj?' '+t.subj:''} · `:''}${t.due?`<span${overdue?' style="color:var(--bad);font-weight:700"':''}>${md(t.due)}까지</span>`:'기한 없음'}${t.done&&t.doneAt?` · ${fmtAt(t.doneAt)} 완료`:''}</div></div>
+    <button class="undo" data-deltodo="${t.id}" aria-label="삭제">삭제</button></div>`;
+}
+
+const pri=a=>a.status==='todo'&&a.type==='숙제평가'&&a.due<TODAY?0:a.status==='submitted'?1:a.status==='todo'&&a.due<=TODAY?2:a.status==='todo'&&D(a.given)<=D(TODAY)?3:a.status==='todo'?4:5;
+function tStudentDetail(sid){
+  const s=stu(sid);if(!s){stuDetail=null;return tStudents()}
+  const occ=[];for(let i=-14;i<=7;i++){const day=add(TODAY,i);ALL_SCHEDULE.filter(x=>x.sid===sid&&x.dow===D(day).getDay()).forEach(o=>occ.push({...o,day}))}
+  const past=occ.filter(o=>o.day<TODAY||(o.day===TODAY&&o.time<=NOW_TIME)).reverse(), next=occ.filter(o=>!past.includes(o));
+  const mine=ASSIGN.filter(a=>RESULTS[a.id]?.[sid]).map(a=>({...a,...RESULTS[a.id][sid]}));
+  const gr=mine.filter(a=>a.status==='graded'&&a.correct!=null), avg=gr.length?(gr.reduce((x,a)=>x+rate(a),0)/gr.length).toFixed(1):'-';
+  const open=TODOS.filter(t=>t.sid===sid&&!t.done);
+  const row=o=>{const l=lessonOf(sid,o.day,o.subj)||{}, td=todosOf(sid,o.day,o.subj).filter(t=>!t.done).length, isPast=past.includes(o);
+    return `<button class="lrow" data-open="${lkey(sid,o.day,o.subj)}"><span class="d">${mdw(o.day)}<small>${o.time}</small></span>
+      <span style="flex:1;text-align:left">${sTag(o.subj)} ${esc(l.topic||'')}</span>
+      <span class="badges">${isPast?(l.good?'<i class="b ok">피드백 ✓</i>':'<i class="b no">피드백 미작성</i>'):''}${td?`<i class="b todo">할일 ${td}</i>`:''}</span></button>`};
+  return `<div class="head"><button class="undo" data-sback="1" style="padding:0">← 학생 목록</button><h1>${esc(s.name)}</h1>
+    <div class="sub">${esc(s.school)} ${esc(s.grade)} · ${s.subjects.join('·')} · 로그인 번호 ••••</div></div>
+  ${pinNotice&&pinNotice.sid===sid?`<section class="card private"><b>${pinNotice.isNew?'로그인 번호':'새 로그인 번호'}: <span style="font-size:24px;letter-spacing:4px">${pinNotice.pin}</span></b><p class="muted" style="margin:4px 0 0">지금만 보여요. 아래 전용 링크와 함께 학생에게 알려 주세요.</p></section>`:''}
+  <section class="card"><h2>학생 전용 링크 <small>이 링크로 열면 바로 이 학생 화면</small></h2>
+    ${LINKS[sid]?`<div class="linkbox">${esc(linkUrl(sid))}</div>
+    <div class="acts" style="margin-top:8px"><button class="btn sm" data-copylink="${sid}">링크 복사</button>${navigator.share?`<button class="btn sm ghost" data-sharelink="${sid}">공유하기</button>`:''}
+      <button class="btn sm danger" data-rotlink="${sid}">${armed==='l'+sid?'정말 새로 만들기':'새 링크 만들기'}</button></div>
+    <p class="muted" style="margin:8px 0 0">학생이 처음 열 때 번호 네 자리를 한 번 넣으면 그다음부터는 바로 들어가요. 링크가 다른 사람에게 퍼졌으면 "새 링크 만들기"를 누르세요. 예전 링크는 바로 못 써요.</p>`:'<div class="empty">링크를 불러오지 못했어요.</div>'}</section>
+  <div class="acts" style="margin-bottom:12px"><button class="btn sm" data-preview="${sid}">학생 화면 보기</button><button class="btn sm ghost" data-repin="${sid}">번호 변경</button>
+    <button class="btn sm ghost" data-schoolof="${sid}">학교 성적 입력</button><button class="btn sm danger" data-delstu="${sid}">${armed==='s'+sid?'정말 삭제':'삭제'}</button></div>
+  <section class="card"><div class="stats"><div class="stat"><b>${avg}${avg==='-'?'':'%'}</b><span>평균 정답률</span></div>
+    <div class="stat"><b>${mine.filter(a=>a.status==='todo'&&D(a.given)<=D(TODAY)).length}</b><span>진행 중 과제</span></div>
+    <div class="stat"><b>${open.length}</b><span>내 할일</span></div></div></section>
+  <section class="card"><h2>다가오는 수업 <small>수업을 누르면 기록·과제·할일</small></h2>${next.length?next.map(row).join(''):'<div class="empty">일주일 안에 수업이 없어요.</div>'}</section>
+  <section class="card"><h2>지난 수업 <small>최근 2주</small></h2>${past.length?past.map(row).join(''):'<div class="empty">지난 2주 수업이 없어요.</div>'}</section>
+  <section class="card"><h2>과제 현황 <small>처리할 것부터 · 누르면 채점표</small></h2>${mine.length?[...mine].sort((a,b)=>pri(a)-pri(b)||(pri(a)===5?b.due.localeCompare(a.due):a.due.localeCompare(b.due))).slice(0,8).map(a=>`<div class="srow"><div>${sTag(a.subj)} <span class="tag type">${a.type}</span> ${esc(a.title)}<div class="muted" style="font-size:12px">마감 ${mdw(a.due)}</div></div>
+    <button class="glink" data-grade="${a.id}" data-hl="${sid}">${a.status==='graded'&&a.correct!=null?`<b${rate(a)<=50?' style="color:var(--bad)"':''}>${rate(a)}%</b>`:a.status==='submitted'?'<span class="st done">완료 · 채점 전</span>':a.type==='숙제평가'&&a.due<TODAY?'<span class="st late">마감 지남 · 미완료</span>':a.due<=TODAY?'<span class="st soon">채점 전</span>':`<span class="muted">${D(a.given)>D(TODAY)?'예정':'진행 중'}</span>`} ›</button></div>`).join(''):'<div class="empty">과제가 없어요.</div>'}</section>`;
+}
+
+function tLessonPage(){
+  const {sid,date,subj}=lessonCtx, s=stu(sid);if(!s){lessonCtx=null;return render()}
+  const time=timeOf(sid,date,subj), l=lessonOf(sid,date,subj)||{};
+  const given=ASSIGN.filter(a=>a.from===lkey(sid,date,subj)||(a.given===date&&a.subj===subj&&RESULTS[a.id]?.[sid]));
+  const mates=occurrences(date).filter(o=>o.subj===subj&&o.time===time&&o.sid!==sid);
+  const td=todosOf(sid,date,subj).sort((a,b)=>a.done-b.done);
+  return `<div class="head"><button class="undo" data-lback="1" style="padding:0">← ${backTo==='detail'?esc(s.name)+' 페이지':backTo==='today'?'오늘':'수업 목록'}</button>
+    <h1>${esc(s.name)} · ${subj} 수업</h1><div class="sub">${mdw(date)} ${time}${date===TODAY?' · 오늘':''}</div></div>
+  <section class="card"><h2>수업 기록 <small>학생에게 보여요</small></h2><form id="lessonForm" class="form">
+    <label class="full">수업 주제<input name="topic" value="${esc(l.topic||'')}" placeholder="관계대명사 what"></label>
+    <label class="full">준비할 것<input name="prep" value="${esc(l.prep||'')}"></label>
+    <label class="full">잘한 점<textarea name="good">${esc(l.good||'')}</textarea></label>
+    <label class="full">보완할 점<textarea name="next">${esc(l.next||'')}</textarea></label>
+    <button class="btn full">기록 저장</button></form></section>
+  <section class="card"><h2>과제 내기 <small>${subj} · 내준 날 ${mdw(date)}</small></h2>
+    <form id="lessonHwForm" class="form">
+      <label>종류<select name="type" id="hwType">${TYPES.map(t=>`<option${t==='숙제평가'?' selected':''}>${t}</option>`).join('')}</select></label>
+      <label>마감일<input name="due" type="date" value="${add(date,3)}" required></label>
+      <label class="full">제목<input name="title" required placeholder="관계대명사 what 워크북"></label>
+      <label class="full">단원·목차<input name="unit" required value="${esc(l.topic||'')}"></label>
+      <label>문항 수<input name="total" type="number" min="1" value="20" required></label>
+      <div class="full form" id="unitOnly" style="display:none">
+        <label>만점<input name="max" type="number" min="1" value="100"></label>
+        <label>전국 평균<input name="nat" type="number" step="0.1"></label><label>경남 평균<input name="gn" type="number" step="0.1"></label></div>
+      ${mates.length?`<div class="full fl">같은 시간 학생에게도 내기<div class="checks">${mates.map(m=>`<label><input type="checkbox" name="t" value="${m.sid}" checked> ${esc(stu(m.sid).name)}</label>`).join('')}</div></div>`:''}
+      <button class="btn full">${esc(s.name)}${mates.length?' 외':''}에게 과제 내기</button></form></section>
+  <section class="card"><h2>낸 과제 <small>${given.length}개</small></h2>
+    ${given.map(a=>`<div class="srow"><div><span class="tag type">${a.type}</span> <b>${esc(a.title)}</b><div class="muted" style="font-size:12px">${esc(a.unit)} · 마감 ${mdw(a.due)} · ${a.total}문항</div></div><button class="btn sm ghost" data-grade="${a.id}">채점표</button></div>`).join('')||'<div class="empty" style="padding:10px 0">아직 낸 과제가 없어요.</div>'}
+</section>
+  <section class="card private"><h2>🔒 내 할일 <small>선생님만 보여요</small></h2>
+    ${td.length?td.map(t=>todoRow(t,false)).join(''):'<div class="empty" style="padding:10px 0">이 수업에 연결된 할일이 없어요.</div>'}
+    <form id="todoForm" class="form" style="margin-top:10px">
+      <label class="full">할일<input name="text" placeholder="워크북 인쇄, 학부모 연락 …" required></label>
+      <label>기한<input name="due" type="date" value="${date}"></label><button class="btn">추가</button></form></section>`;;
+}
+
+function tTodos(){
+  const open=TODOS.filter(t=>!t.done), byDue=(a,b)=>(a.due||'9').localeCompare(b.due||'9');
+  const groups=[['기한 지남',open.filter(t=>t.due&&t.due<TODAY)],['오늘',open.filter(t=>t.due===TODAY)],['다가오는',open.filter(t=>t.due&&t.due>TODAY)],['기한 없음',open.filter(t=>!t.due)]];
+  const done=TODOS.filter(t=>t.done).sort((a,b)=>(b.doneAt||'').localeCompare(a.doneAt||'')).slice(0,10);
+  return `<div class="head"><h1>🔒 내 할일</h1><div class="sub">선생님만 보여요 · 남은 할일 ${open.length}개</div></div>
+  <section class="card private"><h2>할일 추가</h2><form id="todoPageForm" class="form">
+    <label class="full">할일<input name="text" required placeholder="교재 주문, 학부모 상담 문자 …"></label>
+    <label>기한<input name="due" type="date" value="${TODAY}"></label>
+    <label>학생 <span style="font-weight:400">(선택)</span><select name="sid"><option value="">선택 안 함</option>${STUDENTS.map(x=>`<option value="${x.id}">${esc(x.name)}</option>`).join('')}</select></label>
+    <label>과목 <span style="font-weight:400">(선택)</span><select name="subj"><option value="">선택 안 함</option><option>영어</option><option>수학</option></select></label>
+    <button class="btn">추가</button></form>
+    <p class="muted" style="margin:8px 0 0">특정 수업에 연결하려면 수업 페이지의 "할일"에서 추가하세요.</p></section>
+  ${groups.filter(([,xs])=>xs.length).map(([k,xs])=>`<section class="card private"><h2>${k} <small>${xs.length}개</small></h2>${xs.sort(byDue).map(t=>todoRow(t,true)).join('')}</section>`).join('')||'<section class="card"><div class="empty">남은 할일이 없어요.</div></section>'}
+  ${done.length?`<details class="card"><summary><b>완료한 할일</b> <span class="muted">최근 ${done.length}개</span></summary>${done.map(t=>todoRow(t,true)).join('')}</details>`:''}`;
+}
+const TVIEWS={today:tToday,todos:tTodos,students:tStudents,lessons:tLessons,work:tWork,school:tSchool};
+
+// ===================== 데이터베이스 연결 =====================
+// 공개해도 되는 값이에요 (브라우저용 publishable 키). 데이터는 데이터베이스 보안 규칙이 지켜요.
+const SB_URL='https://pcwkoyracxewtglkiyar.supabase.co', SB_KEY='sb_publishable_cnd22D4T5FezdotJX8trXg_VW0ZYTy-';
+const DB=window.__FAKE_DB__||{
+  sb:null,
+  async init(){this.sb=supabase.createClient(SB_URL,SB_KEY,{auth:{persistSession:true,autoRefreshToken:true}})},
+  async rows(t){let out=[],from=0;for(;;){const {data,error}=await this.sb.from(t).select('*').range(from,from+999);if(error)throw error;out=out.concat(data);if(data.length<1000)break;from+=1000}return out},
+  async insert(t,row){const {data,error}=await this.sb.from(t).insert(row).select().single();if(error)throw error;return data},
+  async insertMany(t,rows){const {error}=await this.sb.from(t).insert(rows);if(error)throw error},
+  async upsert(t,rows,onConflict){const {error}=await this.sb.from(t).upsert(rows,{onConflict});if(error)throw error},
+  async update(t,patch,match){let q=this.sb.from(t).update(patch);for(const[k,v] of Object.entries(match))q=q.eq(k,v);const {error}=await q;if(error)throw error},
+  async remove(t,match){let q=this.sb.from(t).delete();for(const[k,v] of Object.entries(match))q=q.eq(k,v);const {error}=await q;if(error)throw error},
+  async rpc(fn,args){const {data,error}=await this.sb.rpc(fn,args);if(error)throw error;return data},
+  async api(path,body){const {data}=await this.sb.auth.getSession();const tk=data.session?.access_token;
+    const r=await fetch(`${SB_URL}/functions/v1/api/${path}`,{method:body?'POST':'GET',headers:{'content-type':'application/json',apikey:SB_KEY,...(tk?{'x-user-token':tk}:{})},body:body?JSON.stringify(body):undefined});
+    let j={};try{j=await r.json()}catch(e){}if(!r.ok){const er=new Error(j.error||'서버에 연결하지 못했어요');er.status=r.status;er.data=j;throw er}return j},
+  async setSession(s){const {error}=await this.sb.auth.setSession(s);if(error)throw error},
+  async signInEmail(email,password){const {error}=await this.sb.auth.signInWithPassword({email,password});if(error)throw error},
+  async signOut(){await this.sb.auth.signOut()},
+  async myProfile(){const {data:{user}}=await this.sb.auth.getUser();if(!user)return null;const {data}=await this.sb.from('profiles').select('*').eq('id',user.id).single();return data}
+};
+// 화면 코드는 학생을 작은 번호로 다루고, 저장할 때 실제 id(uuid)로 바꿔요
+const uid2n=new Map();let nextN=1;
+const N=uid=>{if(uid==null)return null;if(!uid2n.has(uid))uid2n.set(uid,nextN++);return uid2n.get(uid)};
+const U=n=>STUDENTS.find(s=>s.id===n)?.uid??(n===curSid?MYUID:null);
+const nn=v=>v==null?null:+v;
+const localAt=ts=>{if(!ts)return null;const d=new Date(ts);return `${S(d)} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`};
+let MYUID=null, LINKS={};
+const linkUrl=n=>LINKS[n]?`${location.origin}${location.pathname}#t=${LINKS[n]}`:'';
+async function loadAll(){
+  const [P,SC,LE,AS,RE,SG]=await Promise.all(['profiles','schedules','lessons','assignments','results','school_grades'].map(t=>DB.rows(t)));
+  const TD=role==='teacher'?await DB.rows('teacher_todos'):[];
+  LINKS={};if(role==='teacher')(await DB.rows('student_links')).forEach(r=>{LINKS[N(r.student_id)]=r.token});
+  const studs=P.filter(p=>p.role==='student');
+  [...studs].sort((a,b)=>String(a.created_at).localeCompare(String(b.created_at))).forEach(p=>N(p.id));
+  STUDENTS.length=0;studs.sort((a,b)=>a.name.localeCompare(b.name,'ko')).forEach(p=>STUDENTS.push({id:N(p.id),uid:p.id,name:p.name,school:p.school||'',grade:p.grade||'',subjects:p.subjects||[]}));
+  const me=P.find(p=>p.id===MYUID);if(me&&role==='teacher')TEACHER.name=me.name;
+  ALL_SCHEDULE.length=0;SC.forEach(r=>ALL_SCHEDULE.push({id:r.id,sid:N(r.student_id),dow:r.dow,time:r.time,subj:r.subject}));
+  ALL_LESSONS.length=0;LE.forEach(r=>ALL_LESSONS.push({sid:N(r.student_id),date:r.date,subj:r.subject,topic:r.topic||'',prep:r.prep||'',good:r.good||'',next:r.next||''}));
+  ASSIGN.length=0;AS.forEach(r=>ASSIGN.push({id:r.id,subj:r.subject,type:r.type,title:r.title,unit:r.unit||'',given:r.given,due:r.due,total:r.total,max:nn(r.max),nat:nn(r.nat),gn:nn(r.gn)}));
+  for(const k in RESULTS)delete RESULTS[k];ASSIGN.forEach(a=>RESULTS[a.id]={});
+  RE.forEach(r=>{(RESULTS[r.assignment_id]??={})[N(r.student_id)]={status:r.status,doneAt:localAt(r.done_at),correct:r.correct,score:nn(r.score)}});
+  ALL_SCHOOL.length=0;SG.forEach(r=>ALL_SCHOOL.push({sid:N(r.student_id),term:r.term,subj:r.subject,mid:nn(r.mid),fin:nn(r.fin),avg:nn(r.avg),lv:r.lv||'',rank:r.rank,n:r.n}));
+  TODOS=TD.map(r=>({id:r.id,sid:N(r.student_id),date:r.lesson_date,subj:r.subject,text:r.text,due:r.due,done:r.done,doneAt:localAt(r.done_at)}));
+  if(!stu(schoolSid))schoolSid=STUDENTS[0]?.id??null;
+}
+// 저장 → 다시 불러오기 → 화면 갱신. 실패하면 이유를 보여 줘요
+async function save(fn,msg){
+  try{const out=await fn();await loadAll();if(role==='student'||preview)load(curSid);const m=typeof msg==='function'?msg(out):msg;render();if(m)toast(m);return true}
+  catch(e){console.error(e);toast('저장하지 못했어요: '+(e.message||e));try{await loadAll()}catch(_){}render();return false}
+}
+
+// ===================== 로그인 =====================
+// 학생: 선생님이 준 전용 링크(#t=…)로 열고, 처음 한 번만 번호 네 자리
+// 선생님: 주소 끝에 #teacher
+let needsSetup=false, loginErr='', lockedUntil=0, busy=false, lockTimer=null, pinNotice=null;
+let gate='none', linkToken=null, linkName='', linkBad='';
+const LINK_KEY='borine-link';
+function readRoute(){
+  const h=location.hash||'';
+  if(h.startsWith('#t=')){linkToken=h.slice(3).replace(/[^a-f0-9]/g,'');try{localStorage.setItem(LINK_KEY,linkToken)}catch(e){}gate='student'}
+  else if(h==='#teacher'){gate='teacher'}
+  else{try{linkToken=localStorage.getItem(LINK_KEY)}catch(e){}gate=linkToken?'student':'none'}
+}
+async function prepareGate(){
+  loginErr='';linkBad='';
+  if(gate==='teacher'){try{const r=await DB.api('status');needsSetup=!!r.needsSetup}catch(e){loginErr=e.message}}
+  if(gate==='student'&&linkToken){try{const r=await DB.api('link?t='+encodeURIComponent(linkToken));linkName=r.name||''}catch(e){linkBad=e.message}}
+}
+function login(){
+  if(gate==='teacher'&&needsSetup) return `<div class="head" style="padding-top:28px"><div class="sub">보리네 · 처음 설정</div><h1>선생님 계정 만들기</h1></div>
+    <section class="card"><p class="muted" style="margin:0">처음 한 번만 하는 설정이에요. 여기서 만든 이메일과 비밀번호로 선생님 화면에 들어가요. 선생님 계정이 만들어지면 이 화면은 다시 나오지 않아요.</p></section>
+    <form id="setupForm" class="card form" style="max-width:420px">
+      <label class="full">이름 (학생에게 보여요)<input name="name" value="보리네 선생님" required></label>
+      <label class="full">이메일<input name="email" type="email" autocomplete="username" required></label>
+      <label class="full">비밀번호 (8자 이상)<input name="password" type="password" autocomplete="new-password" minlength="8" required></label>
+      <label class="full">비밀번호 확인<input name="password2" type="password" autocomplete="new-password" minlength="8" required></label>
+      ${loginErr?`<p class="full" style="color:var(--bad);margin:0">${esc(loginErr)}</p>`:''}
+      <button class="btn full"${busy?' disabled':''}>${busy?'만드는 중…':'선생님 계정 만들기'}</button></form>`;
+  if(gate==='teacher') return `<div class="head" style="padding-top:28px"><div class="sub">보리네</div><h1>선생님 로그인</h1></div>
+    <form id="teacherLogin" class="card form" style="max-width:420px">
+      <label class="full">이메일<input name="email" type="email" autocomplete="username" required></label>
+      <label class="full">비밀번호<input name="password" type="password" autocomplete="current-password" required></label>
+      ${loginErr?`<p class="full" style="color:var(--bad);margin:0">${esc(loginErr)}</p>`:''}
+      <button class="btn full"${busy?' disabled':''}>${busy?'확인 중…':'로그인'}</button></form>`;
+  if(gate==='none'||linkBad) return `<div style="padding-top:22vh;text-align:center"><img src="./icon.svg" alt="" width="72" height="72" style="border-radius:18px">
+    <h1 style="font-size:26px;margin:16px 0 6px">보리네</h1>
+    <p class="muted" style="max-width:300px;margin:0 auto">${linkBad?esc(linkBad):'선생님께 받은 나만의 링크로 열어 주세요.'}</p></div>`;
+  const left=Math.ceil((lockedUntil-Date.now())/1000), locked=left>0;
+  const msg=locked?`<span style="color:var(--bad)">5번 틀려서 잠겼어요. ${left>=60?Math.ceil(left/60)+'분':left+'초'} 뒤에 다시 해 주세요.</span>`
+    :loginErr?`<span style="color:var(--bad)">${esc(loginErr)}</span>`:busy?'확인 중…':'처음 한 번만 번호 네 자리를 눌러 주세요';
+  const dis=locked||busy?' disabled':'';
+  return `<div class="head" style="padding-top:28px;text-align:center"><div class="sub">보리네</div><h1>${esc(linkName)}님, 반가워요</h1></div>
+    <section class="card pinbox">
+      <div class="pins${shake?' shake':''}" aria-label="입력한 자리 수 ${pin.length}/4">${[0,1,2,3].map(i=>`<i class="${i<pin.length?'on':''}"></i>`).join('')}</div>
+      <p class="muted" style="text-align:center;min-height:22px;margin:10px 0 14px" role="status">${msg}</p>
+      <div class="pad">${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-key="${n}"${dis}>${n}</button>`).join('')}
+        <span></span><button data-key="0"${dis}>0</button><button data-key="del" aria-label="지우기"${dis}>⌫</button></div>
+    </section>`;
+}
+function startLockTimer(){clearInterval(lockTimer);lockTimer=setInterval(()=>{if(role){clearInterval(lockTimer);return}render();if(Date.now()>lockedUntil){clearInterval(lockTimer);loginErr='';render()}},1000)}
+async function tryPin(){
+  busy=true;render();
+  try{const {session}=await DB.api('login',{token:linkToken,pin});await DB.setSession(session);pin='';loginErr='';await enter()}
+  catch(e){pin='';shake=true;loginErr=e.message;if(e.status===404)linkBad=e.message;if(e.data?.lockedFor){lockedUntil=Date.now()+e.data.lockedFor*1000;loginErr='';startLockTimer()}busy=false;render();setTimeout(()=>{shake=false},400)}
+}
+async function enter(){
+  const p=await DB.myProfile();
+  if(!p){role=null;busy=false;loginErr='계정 정보를 찾지 못했어요. 선생님께 문의해 주세요.';render();return}
+  role=p.role==='admin'?'teacher':'student';MYUID=p.id;
+  view.innerHTML='<div class="empty" style="padding-top:30vh">불러오는 중…</div>';bar.hidden=true;
+  try{await loadAll()}catch(e){view.innerHTML=`<section class="card" style="margin-top:20vh"><b>불러오지 못했어요</b><p class="muted">${esc(e.message)}</p><button class="btn" data-logout="1">처음으로</button></section>`;busy=false;return}
+  if(role==='student'){curSid=N(p.id);load(curSid);tab='home'}else{ttab='today'}
+  busy=false;render();window.scrollTo(0,0);
+}
+async function logout(){
+  const was=role;
+  await DB.signOut();role=null;preview=false;pin='';sLesson=null;stuDetail=null;lessonCtx=null;gradeId=null;
+  if(was==='teacher'){gate='teacher';if(location.hash!=='#teacher')history.replaceState(null,'','#teacher')}
+  view.innerHTML='<div class="empty" style="padding-top:30vh">로그아웃 중…</div>';await prepareGate();render();window.scrollTo(0,0);
+}
+
+// ===================== 화면 그리기 =====================
+const tabsHtml=(list,cur,key)=>list.map(t=>`<button data-${key}="${t.id}"${t.id===cur?' aria-current="page"':''}><svg viewBox="0 0 24 24" aria-hidden="true">${t.icon}</svg>${t.label}</button>`).join('');
+function tick(){const n=new Date();TODAY=S(n);NOW_TIME=`${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}`}
+function render(){
+  tick();
+  if(!role){view.innerHTML=login();bar.hidden=true;return}
+  bar.hidden=false;
+  if(role==='teacher'&&!preview){view.innerHTML=lessonCtx?tLessonPage():(ttab==='students'&&stuDetail!=null)?tStudentDetail(stuDetail):TVIEWS[ttab]();bar.style.setProperty('--n',6);bar.innerHTML=tabsHtml(TTABS,ttab,'ttab');return}
+  load(curSid);bar.style.setProperty('--n',5);
+  view.innerHTML=(preview?`<div class="pv"><span>미리보기 · ${esc(ME.name)} 학생 화면</span><button data-endpreview="1">선생님 화면으로</button></div>`:'')+(sLesson?sLessonPage():{home,lesson,homework,grades,my}[tab]());
+  bar.innerHTML=tabsHtml(TABS,tab,'tab');
+}
+function toast(m){const el=document.getElementById('toast');el.textContent=m;el.classList.add('on');clearTimeout(toast.h);toast.h=setTimeout(()=>el.classList.remove('on'),2600)}
+function goTab(t){tab=t;sLesson=null;render();window.scrollTo(0,0)}
+function goT(t){ttab=t;armed=null;pinNotice=null;render();window.scrollTo(0,0)}
+const num=v=>v===''||v==null?null:Number(v);
+const newPin=()=>String(Math.floor(Math.random()*10000)).padStart(4,'0');
+
+document.addEventListener('change',e=>{
+  const t=e.target;
+  if(t.id==='schoolSid'){schoolSid=+t.value;render()}
+  if(t.id==='hwType')document.getElementById('unitOnly').style.display=t.value==='단원평가'?'grid':'none';
+  if(t.id==='hwSubj')document.querySelectorAll('#hwTargets input').forEach(c=>{c.checked=stu(+c.value).subjects.includes(t.value)});
+});
+document.addEventListener('input',e=>{
+  const t=e.target;if(!t.classList.contains('gin')||!t.dataset.total)return;
+  const cell=document.getElementById(t.dataset.r), v=num(t.value), r=v==null?null:Math.round(v/+t.dataset.total*1000)/10;
+  cell.textContent=r==null?'-':r+'%';cell.style.color=r!=null&&r<=50?'var(--bad)':'';cell.style.fontWeight=r!=null&&r<=50?'700':'';
+});
+document.addEventListener('submit',async e=>{
+  e.preventDefault();const f=e.target, fd=new FormData(f), g=k=>String(fd.get(k)??'').trim();
+  const btn=f.querySelector('button:not([type=button])');if(btn){if(btn.disabled)return;btn.disabled=true}
+  try{
+  if(f.id==='setupForm'){
+    if(String(fd.get('password'))!==String(fd.get('password2'))){loginErr='비밀번호 확인이 맞지 않아요.';render();return}
+    busy=true;loginErr='';render();
+    try{const r=await DB.api('setup',{name:g('name'),email:g('email'),password:String(fd.get('password'))});needsSetup=false;
+      if(r.session)await DB.setSession(r.session);else await DB.signInEmail(g('email'),String(fd.get('password')));await enter()}
+    catch(er){busy=false;loginErr=er.message;render()}return}
+  if(f.id==='teacherLogin'){busy=true;loginErr='';render();
+    try{await DB.signInEmail(g('email'),String(fd.get('password')||''));await enter()}catch(er){busy=false;loginErr='이메일 또는 비밀번호가 맞지 않아요.';render()}return}
+  if(f.id==='stuForm'){
+    const subjects=fd.getAll('subj');
+    if(!g('name')){toast('이름을 넣어 주세요');return}
+    if(!/^\d{4}$/.test(g('pin'))){toast('로그인 번호는 숫자 4자리예요');return}
+    if(!subjects.length){toast('과목을 하나 이상 골라 주세요');return}
+    const nm=g('name'),pn=g('pin');
+    await save(()=>DB.api('admin',{action:'create',name:nm,school:g('school'),grade:g('grade'),subjects,pin:pn}),out=>{const n=N(out.id);stuDetail=n;ttab='students';pinNotice={sid:n,pin:pn,isNew:true};return `${nm} 학생을 등록했어요`});window.scrollTo(0,0);return}
+  if(f.id==='schedForm'){
+    await save(()=>DB.insert('schedules',{student_id:U(+g('sid')),dow:+g('dow'),time:g('time'),subject:g('subj')}),'시간표에 추가했어요');return}
+  if(f.id==='lessonForm'){
+    const {sid,date,subj}=lessonCtx;
+    await save(()=>DB.upsert('lessons',[{student_id:U(sid),date,subject:subj,topic:g('topic'),prep:g('prep'),good:g('good'),next:g('next')}],'student_id,date,subject'),'수업 기록을 저장했어요');return}
+  if(f.id==='todoPageForm'){if(!g('text'))return;
+    await save(()=>DB.insert('teacher_todos',{student_id:g('sid')?U(+g('sid')):null,subject:g('subj')||null,text:g('text'),due:g('due')||null}),'할일을 추가했어요');return}
+  if(f.id==='todoForm'){
+    const {sid,date,subj}=lessonCtx;if(!g('text'))return;
+    await save(()=>DB.insert('teacher_todos',{student_id:U(sid),lesson_date:date,subject:subj,text:g('text'),due:g('due')||null}),'내 할일에 추가했어요');return}
+  if(f.id==='lessonHwForm'||f.id==='hwForm'){
+    const fromLesson=f.id==='lessonHwForm', ctx=lessonCtx||{};
+    const subj=fromLesson?ctx.subj:g('subj'), given=fromLesson?ctx.date:g('given');
+    const ts=[...(fromLesson?[ctx.sid]:[]),...fd.getAll('t').map(Number)];
+    if(!g('title')||!g('unit')){toast('제목과 단원·목차를 넣어 주세요');return}
+    if(g('due')<given){toast('마감일이 내준 날보다 빨라요');return}
+    if(!ts.length){toast('대상 학생을 골라 주세요');return}
+    const row={subject:subj,type:g('type'),title:g('title'),unit:g('unit'),given,due:g('due'),total:+g('total')};
+    if(row.type==='단원평가'){row.max=+g('max')||100;row.nat=num(g('nat'));row.gn=num(g('gn'))}
+    const ok=await save(async()=>{const a=await DB.insert('assignments',row);
+      try{await DB.insertMany('results',ts.map(n=>({assignment_id:a.id,student_id:U(n)})))}catch(er){await DB.remove('assignments',{id:a.id});throw er}},`${ts.length}명에게 과제를 냈어요`);
+    if(ok&&!fromLesson){hwView='list';render();window.scrollTo(0,0)}return}
+  if(f.id==='gradeForm'){
+    const a=ASSIGN.find(x=>x.id===+f.dataset.id);const ups=[];
+    for(const sid of Object.keys(RESULTS[a.id]||{})){
+      const c=num(g('c_'+sid));if(c==null)continue;
+      if(!Number.isInteger(c)||c<0||c>a.total){toast(`${stu(+sid).name}: 맞은 수는 0~${a.total} 정수예요`);return}
+      let sc=null;if(a.type==='단원평가'){sc=num(g('s_'+sid));if(sc==null||sc<0||sc>a.max){toast(`${stu(+sid).name}: 점수를 0~${a.max}로 넣어 주세요`);return}}
+      ups.push({sid:+sid,correct:c,score:sc})}
+    await save(async()=>{
+      if(a.type==='단원평가')await DB.update('assignments',{nat:num(g('nat')),gn:num(g('gn'))},{id:a.id});
+      await Promise.all(ups.map(u=>DB.update('results',{status:'graded',correct:u.correct,score:u.score},{assignment_id:a.id,student_id:U(u.sid)})));
+    },`${ups.length}명 채점을 저장했어요`);return}
+  if(f.id==='schoolForm'){if(!schoolSid){toast('먼저 학생을 등록해 주세요');return}
+    const rec={mid:num(g('mid')),fin:num(g('fin')),avg:num(g('avg')),lv:g('lv').toUpperCase(),rank:num(g('rank')),n:num(g('n'))};
+    if(rec.mid==null&&rec.fin==null){toast('중간이나 기말 점수를 넣어 주세요');return}
+    if(rec.rank!=null&&rec.n!=null&&rec.rank>rec.n){toast('석차가 수강자 수보다 커요');return}
+    await save(()=>DB.upsert('school_grades',[{student_id:U(schoolSid),term:g('term'),subject:g('subj'),...rec}],'student_id,term,subject'),'학교 성적을 저장했어요');return}
+  }finally{if(btn&&document.body.contains(btn))btn.disabled=false}
+});
+document.addEventListener('click',async e=>{
+  const b=e.target.closest('button,a[data-open],a[data-sdetail]');if(!b||b.disabled)return;const d=b.dataset;
+  // 로그인
+  if(d.key){if(busy)return;const k=d.key;if(k==='del')pin=pin.slice(0,-1);else if(pin.length<4)pin+=k;loginErr='';render();if(pin.length===4)setTimeout(tryPin,120);return}
+  if(d.logout){sLesson=null;if(preview){preview=false;render();return}await logout();return}
+  // 학생
+  if(d.slesson){const[date,subj]=d.slesson.split('|');sLesson={date,subj};render();window.scrollTo(0,0);return}
+  if(d.sback&&(role==='student'||preview)){sLesson=null;render();return}
+  if(d.done||d.undo){if(preview){toast('미리보기에서는 체크할 수 없어요');return}const on=!!d.done;
+    await save(()=>DB.rpc('set_done',{p_assignment:+(d.done||d.undo),p_done:on}),on?()=>`완료했어요 · ${TODAY.slice(5).replace('-','/')} ${NOW_TIME}`:'완료 체크를 취소했어요');return}
+  // 선생님
+  if(d.ttab){gradeId=null;lessonCtx=null;stuDetail=null;goT(d.ttab);return}
+  if(d.sdetail){ttab='students';stuDetail=+d.sdetail;lessonCtx=null;armed=null;pinNotice=null;render();window.scrollTo(0,0);return}
+  if(d.sback){stuDetail=null;pinNotice=null;render();return}
+  if(d.open){const[sid,date,subj]=d.open.split('|');backTo=lessonCtx?backTo:(ttab==='students'&&stuDetail!=null?'detail':ttab==='today'?'today':'lessons');
+    if(backTo==='detail')stuDetail=+sid;lessonCtx={sid:+sid,date,subj};gradeId=null;render();window.scrollTo(0,0);return}
+  if(d.lback){lessonCtx=null;render();window.scrollTo(0,0);return}
+  if(d.todo){const t=TODOS.find(x=>x.id===+d.todo);await save(()=>DB.update('teacher_todos',{done:!t.done,done_at:!t.done?new Date().toISOString():null},{id:t.id}),!t.done?'할일 완료':null);return}
+  if(d.deltodo){await save(()=>DB.remove('teacher_todos',{id:+d.deltodo}));return}
+  if(d.schoolof){schoolSid=+d.schoolof;stuDetail=null;goT('school');return}
+  if(d.preview){preview=true;sLesson=null;curSid=+d.preview;load(curSid);tab=d.pg==='school'?'grades':'home';if(d.pg==='school')gTab='school';render();window.scrollTo(0,0);return}
+  if(d.endpreview){preview=false;sLesson=null;render();window.scrollTo(0,0);return}
+  if(d.install){if(installEvt){installEvt.prompt();const r=await installEvt.userChoice.catch(()=>null);installEvt=null;if(r?.outcome==='accepted')toast('설치했어요')}render();return}
+  if(d.installhide){try{localStorage.setItem('borine-install-hide','1')}catch(er){}render();return}
+  if(d.copylink){const u=linkUrl(+d.copylink);try{await navigator.clipboard.writeText(u);toast('링크를 복사했어요')}catch(er){toast('복사가 안 돼요. 링크를 길게 눌러 복사해 주세요')}return}
+  if(d.sharelink){const s=stu(+d.sharelink);try{await navigator.share({title:'보리네',text:`${s.name} 전용 보리네 링크예요`,url:linkUrl(+d.sharelink)})}catch(er){}return}
+  if(d.rotlink){const k='l'+d.rotlink;if(armed!==k){armed=k;render();return}armed=null;const s=stu(+d.rotlink);
+    await save(()=>DB.rpc('rotate_student_link',{p_student:s.uid}),'새 링크를 만들었어요. 학생에게 다시 보내 주세요');return}
+  if(d.repin){const s=stu(+d.repin),p=newPin();await save(()=>DB.api('admin',{action:'setPin',sid:s.uid,pin:p}),()=>{pinNotice={sid:s.id,pin:p};return `${s.name} 번호를 바꿨어요`});return}
+  if(d.delstu){const k='s'+d.delstu;if(armed!==k){armed=k;render();return}
+    const s=stu(+d.delstu);stuDetail=null;armed=null;await save(()=>DB.api('admin',{action:'delete',sid:s.uid}),`${s.name} 학생을 삭제했어요`);return}
+  if(d.delsched){await save(()=>DB.remove('schedules',{id:+d.delsched}));return}
+  if(d.lmode){lMode=d.lmode;render();return}
+  if(d.lstep){logDate=add(logDate,+d.lstep);render();return}
+  if(d.hwv){hwView=d.hwv;render();return}
+  if(d.grade){gradeBack=lessonCtx?{kind:'lesson',ctx:lessonCtx,back:backTo}:(ttab==='students'&&stuDetail!=null)?{kind:'detail',sid:stuDetail}:ttab==='today'?{kind:'today'}:null;
+    gradeHl=d.hl?+d.hl:null;ttab='work';lessonCtx=null;stuDetail=null;gradeId=+d.grade;render();
+    const r=document.getElementById('hlrow');if(r){r.scrollIntoView({block:'center'});r.querySelector('input')?.focus({preventScroll:true})}else window.scrollTo(0,0);return}
+  if(d.ungrade){gradeId=null;gradeHl=null;const gb=gradeBack;gradeBack=null;
+    if(gb?.kind==='detail'){ttab='students';stuDetail=gb.sid}else if(gb?.kind==='lesson'){lessonCtx=gb.ctx;backTo=gb.back}else if(gb?.kind==='today'){ttab='today'}
+    render();window.scrollTo(0,0);return}
+  if(d.delhw){const k='h'+d.delhw;if(armed!==k){armed=k;render();return}armed=null;await save(()=>DB.remove('assignments',{id:+d.delhw}),'과제를 삭제했어요');return}
+  if(d.editschool){const[t,sj]=d.editschool.split('|'),r=ALL_SCHOOL.find(x=>x.sid===schoolSid&&x.term===t&&x.subj===sj),f=document.getElementById('schoolForm');
+    if(r&&f){f.elements.term.value=t;f.elements.subj.value=sj;['mid','fin','avg','lv','rank','n'].forEach(k=>f.elements[k].value=r[k]??'');f.scrollIntoView({block:'start'});toast(`${t} ${sj} 수정 중`)}return}
+  if(d.delschool){const[sid,t,s]=d.delschool.split('|');await save(()=>DB.remove('school_grades',{student_id:U(+sid),term:t,subject:s}));return}
+  // 학생 화면 이동
+  if(d.tab)goTab(d.tab);
+  else if(d.go)goTab(d.go);
+  else if(d.hw){hwMode=d.hw;render()}
+  else if(d.step){hwDate=add(hwDate,+d.step);render()}
+  else if(d.month){const x=D(hwDate);hwDate=S(new Date(x.getFullYear(),x.getMonth()+ +d.month,1));render()}
+  else if(d.day){hwDate=d.day;if(hwMode==='week'){hwMode='day'}render()}
+  else if(d.g){gTab=d.g;render()}
+  else if(d.gper){gPer=d.gper;rDate=TODAY;render()}
+  else if(d.gsub){const k=d.gsub;if(gSubs[k]&&Object.values(gSubs).filter(Boolean).length===1){toast('과목을 하나는 켜 두어야 해요');return}gSubs[k]=!gSubs[k];render()}
+  else if(d.rstep){const x=D(rDate);rDate=gPer==='주간'?add(rDate,7*d.rstep):S(new Date(x.getFullYear(),x.getMonth()+ +d.rstep,1));render()}
+  else if(d.term){term=d.term;render()}
+});
+// 다른 앱 갔다가 돌아오면 최신 데이터로
+document.addEventListener('visibilitychange',async()=>{if(document.visibilityState==='visible'&&role){try{await loadAll();render()}catch(e){}}});
+
+// ===================== 홈 화면에 추가 안내 =====================
+let installEvt=null;
+addEventListener('beforeinstallprompt',e=>{e.preventDefault();installEvt=e;if(role)render()});
+addEventListener('appinstalled',()=>{installEvt=null;try{localStorage.setItem('borine-install-hide','1')}catch(e){}if(role)render()});
+const isStandalone=()=>(!!window.matchMedia&&matchMedia('(display-mode: standalone)').matches)||navigator.standalone===true;
+function installCard(){
+  if(isStandalone()||preview)return '';
+  try{if(localStorage.getItem('borine-install-hide'))return ''}catch(e){}
+  const ua=navigator.userAgent, ios=/iPhone|iPad|iPod/.test(ua)||(/Macintosh/.test(ua)&&'ontouchend' in document), inApp=/KAKAOTALK|NAVER|Instagram|FBAN|FBAV|Line\//i.test(ua);
+  const how=inApp?`카카오톡 같은 앱 안에서 열었어요. 오른쪽 아래(또는 위) <b>⋯ 메뉴 → 다른 브라우저로 열기</b>를 누른 다음 다시 추가해 주세요.`
+    :ios?(/CriOS|FxiOS|EdgiOS/.test(ua)?`<b>공유 버튼(□↑)</b> → <b>홈 화면에 추가</b>를 눌러 주세요. 안 보이면 Safari로 열어서 해 주세요.`:`<b>공유 버튼(□↑)</b>을 눌러요. 안 보이면 주소창 옆 <b>⋯</b> → <b>공유</b>. 공유 화면을 위로 올려 <b>홈 화면에 추가</b> → <b>추가</b>를 눌러 주세요.`)
+    :installEvt?'':`브라우저 오른쪽 위 <b>⋮ 메뉴</b> → <b>홈 화면에 추가</b>(또는 <b>앱 설치</b>)를 눌러 주세요.`;
+  return `<section class="card install"><div style="display:flex;gap:12px;align-items:center"><img src="./icon-192.png" alt="" width="44" height="44" style="border-radius:11px">
+    <div style="flex:1"><b>보리네를 앱처럼 쓰기</b><div class="muted" style="font-size:13px">홈 화면에 추가하면 아이콘을 눌러 바로 들어와요.</div></div></div>
+    ${installEvt?`<button class="btn" data-install="1" style="width:100%;margin-top:10px">홈 화면에 설치</button>`:`<p style="margin:10px 0 0;font-size:14px">${how}</p>`}
+    <button class="undo" data-installhide="1" style="margin-top:4px">다시 보지 않기</button></section>`;
+}
+
+// ===================== 시작 =====================
+if('serviceWorker' in navigator)navigator.serviceWorker.register('./sw.js').catch(()=>{});
+addEventListener('hashchange',()=>location.reload());
+(async()=>{
+  view.innerHTML='<div class="empty" style="padding-top:30vh">불러오는 중…</div>';bar.hidden=true;
+  readRoute();
+  try{await DB.init()}catch(e){view.innerHTML=`<section class="card" style="margin-top:20vh"><b>연결 오류</b><p class="muted">${esc(e.message)}</p></section>`;return}
+  let p=null;try{p=await DB.myProfile()}catch(e){}
+  // 다른 사람 링크로 열었는데 이미 로그인돼 있으면 로그아웃 후 번호부터
+  if(p&&gate==='teacher'&&p.role!=='admin'){await DB.signOut();p=null}
+  if(p){await enter()}else{await prepareGate();render()}
+})();
+
+}
+</script>
+</body>
+</html>
