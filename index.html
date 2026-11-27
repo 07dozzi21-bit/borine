@@ -96,6 +96,7 @@ th{font-size:12px;color:var(--mute);font-weight:500}.num{text-align:right;white-
 .keep{display:flex;align-items:center;justify-content:center;gap:6px;font-size:12px;color:var(--mute);text-align:center}.keep input{width:18px;height:18px}
 .form{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;align-items:end}
 .form>*{min-width:0}input[type=date]{-webkit-appearance:none;appearance:none;min-width:0;display:block}
+.gx{padding:12px 0;border-top:1px solid var(--line)}.gx .top{display:flex;gap:8px;align-items:center}.gxr{display:flex;align-items:center;gap:8px;margin-top:6px;font-size:14px}.gxr .track{flex:1;height:8px;background:var(--soft);border-radius:4px;overflow:hidden}.gxr .track i{display:block;height:100%;border-radius:4px}
 .memo{padding:10px 0;border-bottom:1px solid var(--line)}.memo .top{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .memo .mt{white-space:pre-wrap;word-break:break-word;margin-top:6px;font-size:15px;line-height:1.5}
 .tag.mc{background:var(--soft);color:var(--ink)}.tag.mc.방학{background:#e3efe8;color:#00462A}.tag.mc.특이사항{background:#fde8e6;color:#b3261e}
@@ -427,6 +428,7 @@ function borine(){
   const byType=TYPES.map(t=>{const xs=g.filter(a=>a.type===t);return [t,avgR(xs),xs.length]}).filter(x=>x[2]);
   const strong=g.filter(a=>rate(a)>=80).sort((a,b)=>rate(b)-rate(a)), weak=g.filter(a=>rate(a)<=50).sort((a,b)=>rate(a)-rate(b));
   const units=g.filter(a=>a.type==='단원평가'&&a.nat!=null);
+  const gich=A.filter(a=>a.type==='기출평가'&&a.status==='graded'&&(a.correct!=null||a.score!=null)&&pick(a)&&inR(a,start,end)).sort((a,b)=>b.due.localeCompare(a.due));
   const col=s=>`var(--${s==='영어'?'en':'ma'})`;
   // 총평
   const notes=[];
@@ -456,7 +458,14 @@ function borine(){
       <div class="cmp"><span>나</span><div class="b me" style="width:${a.score/a.max*100}%"></div><span class="v">${a.score}</span>
       <span>경남</span><div class="b" style="width:${(a.gn??0)/a.max*100}%"></div><span class="v">${a.gn??'-'}</span>
       <span>전국</span><div class="b" style="width:${a.nat/a.max*100}%"></div><span class="v">${a.nat}</span></div>
-      <div class="muted" style="margin-top:4px">전국 평균보다 ${Math.abs(a.score-a.nat).toFixed(1)}점 ${a.score>=a.nat?'높아요':'낮아요'}</div></div>`).join('')}</section>`:''}`;
+      <div class="muted" style="margin-top:4px">전국 평균보다 ${Math.abs(a.score-a.nat).toFixed(1)}점 ${a.score>=a.nat?'높아요':'낮아요'}</div></div>`).join('')}</section>`:''}
+  ${gich.length?`<section class="card"><h2>기출평가 <small>${gich.length}회 · 최근 순</small></h2>
+    ${gich.filter(a=>a.correct!=null).length>1?lineChart(subs.map(s=>({color:col(s),labels:true,values:[...gich].reverse().map(a=>a.subj===s&&a.correct!=null?rate(a):null)})),[...gich].reverse().map(a=>md(a.due))):''}
+    ${gich.map(a=>{const r=a.correct!=null?rate(a):null;return `<div class="gx"><div class="top"><span class="tag ${a.subj}">${a.subj}</span><b>${esc(a.title)}</b><span class="muted" style="font-size:12px;margin-left:auto">${mdw(a.due)}</span></div>
+      <div class="muted" style="font-size:13px;margin-top:2px">${esc(a.unit)}</div>
+      <div class="gxr">${r!=null?`<div class="track"><i style="width:${r}%;background:${r<=50?'var(--bad)':col(a.subj)}"></i></div><b${r<=50?' style="color:var(--bad)"':''}>${r}%</b>`:''}
+      <span class="muted">${[a.correct!=null?`${a.correct}/${a.total}문항`:'',a.score!=null?`${a.score}점${a.max?' / '+a.max:''}`:''].filter(Boolean).join(' · ')}</span></div>
+      ${a.correct!=null?`<div class="muted" style="font-size:12px;margin-top:2px">틀린 문항 ${a.total-a.correct}개</div>`:''}</div>`}).join('')}</section>`:''}`;
 }
 
 function school(){
