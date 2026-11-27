@@ -97,6 +97,7 @@ th{font-size:12px;color:var(--mute);font-weight:500}.num{text-align:right;white-
 .form{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;align-items:end}
 .form>*{min-width:0}input[type=date]{-webkit-appearance:none;appearance:none;min-width:0;display:block}
 .gx{padding:12px 0;border-top:1px solid var(--line)}.gx .top{display:flex;gap:8px;align-items:center}.gxr{display:flex;align-items:center;gap:8px;margin-top:6px;font-size:14px}.gxr .track{flex:1;height:8px;background:var(--soft);border-radius:4px;overflow:hidden}.gxr .track i{display:block;height:100%;border-radius:4px}
+.wk-today{border-color:var(--deep)}
 .memo{padding:10px 0;border-bottom:1px solid var(--line)}.memo .top{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .memo .mt{white-space:pre-wrap;word-break:break-word;margin-top:6px;font-size:15px;line-height:1.5}
 .tag.mc{background:var(--soft);color:var(--ink)}.tag.mc.방학{background:#e3efe8;color:#00462A}.tag.mc.특이사항{background:#fde8e6;color:#b3261e}
@@ -584,7 +585,7 @@ function tStudents(){
 }
 
 function tLessons(){
-  const seg=`<div class="seg">${[['sched','정규 시간표'],['log','수업 기록·피드백']].map(([k,l])=>`<button data-lmode="${k}" aria-pressed="${lMode===k}">${l}</button>`).join('')}</div>`;
+  const seg=`<div class="seg">${[['log','일간'],['week','주간'],['sched','정규 시간표']].map(([k,l])=>`<button data-lmode="${k}" aria-pressed="${lMode===k}">${l}</button>`).join('')}</div>`;
   if(lMode==='sched'){
     const rows=[...ALL_SCHEDULE].filter(s=>stu(s.sid)).sort((a,b)=>((a.dow+6)%7)-((b.dow+6)%7)||a.time.localeCompare(b.time));
     return `<div class="head"><h1>수업</h1></div>${seg}
@@ -599,13 +600,21 @@ function tLessons(){
     <section class="card"><h2>정규 시간표 <small>매주 반복</small></h2><table><thead><tr><th>요일</th><th>시간</th><th>과목</th><th>학생</th><th></th></tr></thead><tbody>
       ${rows.map(r=>`<tr><td><b>${DOW[r.dow]}</b></td><td>${r.time}</td><td>${sTag(r.subj)}</td><td>${esc(stu(r.sid).name)}</td><td class="num"><button class="btn sm danger" data-delsched="${r.id}" aria-label="삭제">×</button></td></tr>`).join('')}</tbody></table></section>`;
   }
+  const lrow=(o,day)=>{const l=lessonOf(o.sid,day,o.subj)||{},td=todosOf(o.sid,day,o.subj).filter(t=>!t.done).length;
+    return `<button class="lrow" data-open="${lkey(o.sid,day,o.subj)}"><span class="d">${o.time}</span><span style="flex:1;text-align:left;min-width:0"><b>${esc(stu(o.sid).name)}</b> ${sTag(o.subj)}${exTag(o)} <span class="muted">${esc(l.topic||'')}</span></span>
+      <span class="badges">${l.good?'<i class="b ok">피드백 ✓</i>':''}${td?`<i class="b todo">할일 ${td}</i>`:''}</span></button>`};
+  if(lMode==='week'){const m0=monday(logDate), days=[0,1,2,3,4,5,6].map(i=>add(m0,i)), occs=days.map(d=>[d,occurrences(d)]), n=occs.reduce((x,[,o])=>x+o.length,0);
+    return `<div class="head"><h1>수업</h1></div>${seg}
+    <section class="card"><div class="nav"><button data-lstep="-7" aria-label="지난주">‹</button><b>${mdw(m0)} – ${mdw(days[6])}</b><button data-lstep="7" aria-label="다음 주">›</button></div>
+      <p class="muted" style="margin:0">${m0===monday(TODAY)?"이번 주":"이 주"} 수업 ${n}개 · 수업을 누르면 기록·과제·할일${m0!==monday(TODAY)?` · <button class="undo" data-ltoday="1" style="padding:0">이번 주로</button>`:''}</p></section>
+    ${occs.map(([d,o])=>`<section class="card${d===TODAY?' wk-today':''}"><h2>${mdw(d)}${d===TODAY?' <small>오늘</small>':''} <small>${o.length?o.length+'개':''}</small></h2>
+      ${o.length?o.map(x=>lrow(x,d)).join(''):'<div class="empty" style="padding:4px 0">수업 없음</div>'}</section>`).join('')}`;
+  }
   const occ=occurrences(logDate);
   return `<div class="head"><h1>수업</h1></div>${seg}
   <section class="card"><div class="nav"><button data-lstep="-1" aria-label="이전 날">‹</button><b>${mdw(logDate)}${logDate===TODAY?' · 오늘':''}</b><button data-lstep="1" aria-label="다음 날">›</button></div>
-    ${occ.length?'<p class="muted" style="margin:0">수업을 누르면 기록·과제·할일을 입력해요.</p>':'<div class="empty">이 날은 수업이 없어요.</div>'}</section>
-  ${occ.length?`<section class="card">${occ.map(o=>{const l=lessonOf(o.sid,logDate,o.subj)||{},td=todosOf(o.sid,logDate,o.subj).filter(t=>!t.done).length;
-    return `<button class="lrow" data-open="${lkey(o.sid,logDate,o.subj)}"><span class="d">${o.time}</span><span style="flex:1;text-align:left"><b>${esc(stu(o.sid).name)}</b> ${sTag(o.subj)} <span class="muted">${esc(l.topic||'')}</span></span>
-      <span class="badges">${l.good?'<i class="b ok">피드백 ✓</i>':''}${td?`<i class="b todo">할일 ${td}</i>`:''}</span></button>`}).join('')}</section>`:''}`;
+    ${occ.length?`<p class="muted" style="margin:0">수업 ${occ.length}개 · 수업을 누르면 기록·과제·할일을 입력해요.${logDate!==TODAY?' <button class="undo" data-ltoday="1" style="padding:0">오늘로</button>':''}</p>`:`<div class="empty">이 날은 수업이 없어요.${logDate!==TODAY?' <button class="undo" data-ltoday="1" style="padding:0">오늘로</button>':''}</div>`}</section>
+  ${occ.length?`<section class="card">${occ.map(o=>lrow(o,logDate)).join('')}</section>`:''}`;
 }
 
 function tWork(){
@@ -1122,6 +1131,7 @@ document.addEventListener('click',async e=>{
     const s=stu(+d.delstu);stuDetail=null;armed=null;await save(()=>DB.api('admin',{action:'delete',sid:s.uid}),`${s.name} 학생을 삭제했어요`);return}
   if(d.delsched){await save(()=>DB.remove('schedules',{id:+d.delsched}));return}
   if(d.lmode){lMode=d.lmode;render();return}
+  if(d.ltoday){logDate=TODAY;render();return}
   if(d.lstep){logDate=add(logDate,+d.lstep);render();return}
   if(d.hwv){hwView=d.hwv;render();return}
   if(d.grade){editHw=null;gradeBack=lessonCtx?{kind:'lesson',ctx:lessonCtx,back:backTo}:(ttab==='students'&&stuDetail!=null)?{kind:'detail',sid:stuDetail}:ttab==='today'?{kind:'today'}:null;
