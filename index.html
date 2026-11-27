@@ -234,7 +234,7 @@ const TERM_ORDER=['중1-1','중1-2','중2-1','중2-2','중3-1','중3-2','고1-1'
 let role=null, preview=false, curSid=null, pick=null, pin='', shake=false;
 let A=[],SCHEDULE=[],LESSONS=[],SCHOOL=[],TERMS=[],ME={};
 let tab='home', hwMode='day', hwDate=TODAY, gTab='borine', gPer='전체', gSubs={영어:true,수학:true}, rDate=TODAY, term=null;
-let ttab='today', lMode='sched', logDate=TODAY, hwView='list', gradeId=null, schoolSid=null, armed=null;
+let showPastList=false, ttab='today', lMode='sched', logDate=TODAY, hwView='list', gradeId=null, schoolSid=null, armed=null;
 function load(sid){
   const s=stu(sid)||{id:sid,name:'',school:'',grade:'',subjects:[]}; curSid=sid; ME={...s,teacher:TEACHER.name};
   A=ASSIGN.filter(a=>RESULTS[a.id]&&RESULTS[a.id][sid]).map(a=>({...a,...RESULTS[a.id][sid]}));
@@ -617,14 +617,16 @@ function tWork(){
       <label>경남 평균<input name="gn" type="number" step="0.1" placeholder="채점 때 입력 가능"></label><p class="muted full" style="margin:0">학생별 점수는 과제를 내면 바로 열리는 채점표에서 넣어요.</p></div>
     <div class="full fl">대상 학생<div class="checks" id="hwTargets">${STUDENTS.map(s=>`<label><input type="checkbox" name="t" value="${s.id}"${s.subjects.includes('영어')?' checked':''}> ${esc(s.name)}</label>`).join('')}</div></div>
     <button class="btn full">과제 내기</button></form></section>`;
-  const list=[...ASSIGN].sort((a,b)=>b.due.localeCompare(a.due));
+  const upcoming=ASSIGN.filter(a=>a.due>=TODAY).sort((a,b)=>a.due.localeCompare(b.due)||a.given.localeCompare(b.given)), past=ASSIGN.filter(a=>a.due<TODAY).sort((a,b)=>b.due.localeCompare(a.due));
+  const list=showPastList?[...upcoming,...past]:upcoming;
   return `<div class="head"><h1>과제·채점</h1></div>${seg}
   ${list.map(a=>{const rs=Object.entries(RESULTS[a.id]||{}).filter(([sid])=>stu(+sid)).map(x=>x[1]);
     const done=rs.filter(r=>r.status!=='todo').length, gr=rs.filter(r=>r.status==='graded').length, w=waitingOf(a);
     return `<div class="item" style="background:var(--card)"><div class="top">${sTag(a.subj)}<span class="tag type">${a.type}</span>${w?`<span class="st soon">채점 대기 ${w}</span>`:''}</div>
       <div class="t">${esc(a.title)}</div><div class="meta"><span>${esc(a.unit)}</span></div>
       <div class="meta"><span>내준 날 ${mdw(a.given)}</span><span>마감 ${mdw(a.due)}</span><span>대상 ${rs.length} · 완료 ${done} · 채점 ${gr}</span></div>
-      <div class="acts" style="margin-top:6px"><button class="btn sm" data-grade="${a.id}">채점표</button><button class="btn sm ghost" data-edithw="${a.id}">편집</button><button class="btn sm danger" data-delhw="${a.id}">${armed==='h'+a.id?'정말 삭제':'삭제'}</button></div></div>`}).join('')}`;
+      <div class="acts" style="margin-top:6px"><button class="btn sm" data-grade="${a.id}">채점표</button><button class="btn sm ghost" data-edithw="${a.id}">편집</button><button class="btn sm danger" data-delhw="${a.id}">${armed==='h'+a.id?'정말 삭제':'삭제'}</button></div></div>`}).join('')||'<div class="empty">마감이 남은 과제가 없어요.</div>'}
+  ${past.length?`<button class="more" data-pastlist="1">${showPastList?'마감 지난 과제 숨기기':`마감 지난 과제 ${past.length}개 보기`}</button>`:''}`;
 }
 
 function tGrade(a){
@@ -1138,6 +1140,7 @@ document.addEventListener('click',async e=>{
     else await save(()=>DB.remove('schedules',{id:ex.id}),`${DOW[dow]} ${t} 수업을 뺐어요`);
     return}
   if(d.gfil){gradeFil=d.gfil;render();return}
+  if(d.pastlist){showPastList=!showPastList;render();return}
   if(d.allhw){showAllHw=true;render();return}
   if(d.ungrade){gradeId=null;gradeHl=null;const gb=gradeBack;gradeBack=null;
     if(gb?.kind==='detail'){ttab='students';stuDetail=gb.sid}else if(gb?.kind==='lesson'){lessonCtx=gb.ctx;backTo=gb.back}else if(gb?.kind==='today'){ttab='today'}
