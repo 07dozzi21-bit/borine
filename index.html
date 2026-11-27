@@ -97,6 +97,12 @@ th{font-size:12px;color:var(--mute);font-weight:500}.num{text-align:right;white-
 .form{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;align-items:end}
 .form>*{min-width:0}input[type=date]{-webkit-appearance:none;appearance:none;min-width:0;display:block}
 .gx{padding:12px 0;border-top:1px solid var(--line)}.gx .top{display:flex;gap:8px;align-items:center}.gxr{display:flex;align-items:center;gap:8px;margin-top:6px;font-size:14px}.gxr .track{flex:1;height:8px;background:var(--soft);border-radius:4px;overflow:hidden}.gxr .track i{display:block;height:100%;border-radius:4px}
+.fab{position:fixed;right:20px;bottom:calc(84px + env(safe-area-inset-bottom));z-index:15;width:60px;height:60px;border-radius:50%;border:0;background:var(--deep);color:#fff;font-size:34px;line-height:1;font-weight:300;box-shadow:0 6px 18px rgba(0,0,0,.22);cursor:pointer}
+.fab:active{transform:scale(.94)}
+.sheet-bg{position:fixed;inset:0;border:0;padding:0;cursor:default;z-index:30;background:rgba(0,0,0,.35)}
+.sheet{position:fixed;left:0;right:0;bottom:0;z-index:31;background:var(--card);border-radius:20px 20px 0 0;padding:10px 18px calc(18px + env(safe-area-inset-bottom));max-height:85vh;overflow:auto;box-shadow:0 -8px 24px rgba(0,0,0,.15)}
+.sheet .grab{width:40px;height:5px;border-radius:3px;background:var(--line);margin:0 auto 12px}
+@media(prefers-reduced-motion:no-preference){.sheet{animation:up .2s ease-out}@keyframes up{from{transform:translateY(40px);opacity:.4}}}
 .wk-today{border-color:var(--deep)}
 .memo{padding:10px 0;border-bottom:1px solid var(--line)}.memo .top{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .memo .mt{white-space:pre-wrap;word-break:break-word;margin-top:6px;font-size:15px;line-height:1.5}
@@ -825,20 +831,28 @@ function tLessonPage(){
       <label>기한<input name="due" type="date" value="${date}"></label><button class="btn">추가</button></form></section>`;;
 }
 
+let todoSheet=false;
+const ovl=document.body.appendChild(document.createElement('div'));
+function overlay(){
+  if(!(role==='teacher'&&!preview&&ttab==='todos'&&!lessonCtx&&editHw==null&&!(ttab==='students'&&stuDetail!=null))){todoSheet=false;return ''}
+  if(!todoSheet)return `<button class="fab" data-todoadd="1" aria-label="할일 추가">+</button>`;
+  return `<button class="sheet-bg" data-todoclose="1" aria-label="닫기" tabindex="-1"></button><div class="sheet" role="dialog" aria-label="할일 추가"><div class="grab"></div>
+    <form id="todoPageForm" class="form">
+      <label class="full">할일<input id="todoText" name="text" required placeholder="교재 주문, 학부모 상담 문자 …" autocomplete="off"></label>
+      <label>기한<input name="due" type="date" value="${TODAY}"></label>
+      <label>학생 <span style="font-weight:400">(선택)</span><select name="sid"><option value="">선택 안 함</option>${STUDENTS.map(x=>`<option value="${x.id}">${esc(x.name)}</option>`).join('')}</select></label>
+      <label>과목 <span style="font-weight:400">(선택)</span><select name="subj"><option value="">선택 안 함</option><option>영어</option><option>수학</option></select></label>
+      <div class="full acts"><button type="button" class="btn ghost" data-todoclose="1" style="flex:1">취소</button><button class="btn" style="flex:2">추가</button></div></form>
+    <p class="muted" style="margin:8px 0 0;font-size:12px">특정 수업에 연결하려면 수업 페이지의 "할일"에서 추가하세요.</p></div>`;
+}
 function tTodos(){
   const open=TODOS.filter(t=>!t.done), byDue=(a,b)=>(a.due||'9').localeCompare(b.due||'9');
   const groups=[['기한 지남',open.filter(t=>t.due&&t.due<TODAY)],['오늘',open.filter(t=>t.due===TODAY)],['다가오는',open.filter(t=>t.due&&t.due>TODAY)],['기한 없음',open.filter(t=>!t.due)]];
   const done=TODOS.filter(t=>t.done).sort((a,b)=>(b.doneAt||'').localeCompare(a.doneAt||'')).slice(0,10);
-  return `<div class="head"><h1>🔒 내 할일</h1><div class="sub">선생님만 보여요 · 남은 할일 ${open.length}개</div></div>
-  <section class="card private"><h2>할일 추가</h2><form id="todoPageForm" class="form">
-    <label class="full">할일<input name="text" required placeholder="교재 주문, 학부모 상담 문자 …"></label>
-    <label>기한<input name="due" type="date" value="${TODAY}"></label>
-    <label>학생 <span style="font-weight:400">(선택)</span><select name="sid"><option value="">선택 안 함</option>${STUDENTS.map(x=>`<option value="${x.id}">${esc(x.name)}</option>`).join('')}</select></label>
-    <label>과목 <span style="font-weight:400">(선택)</span><select name="subj"><option value="">선택 안 함</option><option>영어</option><option>수학</option></select></label>
-    <button class="btn">추가</button></form>
-    <p class="muted" style="margin:8px 0 0">특정 수업에 연결하려면 수업 페이지의 "할일"에서 추가하세요.</p></section>
+  return `<div class="head"><h1>🔒 내 할일</h1><div class="sub">선생님만 보여요 · 남은 할일 ${open.length}개 · 오른쪽 아래 +로 추가</div></div>
   ${groups.filter(([,xs])=>xs.length).map(([k,xs])=>`<section class="card private"><h2>${k} <small>${xs.length}개</small></h2>${xs.sort(byDue).map(t=>todoRow(t,true)).join('')}</section>`).join('')||'<section class="card"><div class="empty">남은 할일이 없어요.</div></section>'}
-  ${done.length?`<details class="card"><summary><b>완료한 할일</b> <span class="muted">최근 ${done.length}개</span></summary>${done.map(t=>todoRow(t,true)).join('')}</details>`:''}`;
+  ${done.length?`<details class="card"><summary><b>완료한 할일</b> <span class="muted">최근 ${done.length}개</span></summary>${done.map(t=>todoRow(t,true)).join('')}</details>`:''}
+  <div style="height:72px"></div>`;
 }
 const TVIEWS={today:tToday,todos:tTodos,students:tStudents,lessons:tLessons,work:tWork,school:tSchool};
 
@@ -973,6 +987,7 @@ const tabsHtml=(list,cur,key)=>list.map(t=>`<button data-${key}="${t.id}"${t.id=
 function tick(){const n=new Date();TODAY=S(n);NOW_TIME=`${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}`}
 function render(){
   tick();
+  queueMicrotask(()=>{const h=overlay();if(ovl.innerHTML!==h)ovl.innerHTML=h});
   if(!role){view.innerHTML=login();bar.hidden=true;return}
   bar.hidden=false;
   if(role==='teacher'&&!preview){view.innerHTML=editHw!=null?tEditHw(ASSIGN.find(x=>x.id===editHw)):lessonCtx?tLessonPage():(ttab==='students'&&stuDetail!=null)?tStudentDetail(stuDetail):TVIEWS[ttab]();bar.style.setProperty('--n',6);bar.innerHTML=tabsHtml(TTABS,ttab,'ttab');return}
@@ -1052,7 +1067,7 @@ document.addEventListener('submit',async e=>{
   if(f.id==='lessonForm'){
     const {sid,date,subj}=lessonCtx;
     await save(()=>DB.upsert('lessons',[{student_id:U(sid),date,subject:subj,topic:g('topic'),prep:g('prep'),good:g('good'),next:g('next')}],'student_id,date,subject'),'수업 기록을 저장했어요');return}
-  if(f.id==='todoPageForm'){if(!g('text'))return;
+  if(f.id==='todoPageForm'){if(!g('text'))return;todoSheet=false;
     await save(()=>DB.insert('teacher_todos',{student_id:g('sid')?U(+g('sid')):null,subject:g('subj')||null,text:g('text'),due:g('due')||null}),'할일을 추가했어요');return}
   if(f.id==='todoForm'){
     const {sid,date,subj}=lessonCtx;if(!g('text'))return;
@@ -1101,6 +1116,8 @@ document.addEventListener('click',async e=>{
   if(d.memocancel){memoEdit=null;render();return}
   if(d.delmemo){const k='mm'+d.delmemo;if(armed!==k){armed=k;render();return}armed=null;
     await save(()=>DB.remove('student_memos',{id:+d.delmemo}),'메모를 지웠어요');return}
+  if(d.todoadd){todoSheet=true;ovl.innerHTML=overlay();document.getElementById('todoText')?.focus();return}
+  if(d.todoclose){todoSheet=false;ovl.innerHTML=overlay();return}
   if(d.logout){sLesson=null;if(preview){preview=false;render();return}await logout();return}
   // 학생
   if(d.slesson){const[date,subj]=d.slesson.split('|');sLesson={date,subj};render();window.scrollTo(0,0);return}
