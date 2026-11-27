@@ -261,7 +261,7 @@ const rate=a=>Math.round(a.correct/a.total*1000)/10;
 const fmtAt=t=>{const[d,hm]=t.split(' ');return `${md(d)} ${hm}`};
 const lateMark=a=>a.doneAt&&a.doneAt.slice(0,10)>a.due?' · 마감 후':'';
 function stat(a){
-  if(a.status==='graded') return `<span class="st done">${a.type==='단원평가'?`${a.score}점`:`${a.correct}/${a.total}`}</span>`;
+  if(a.status==='graded') return `<span class="st done">${a.type==='단원평가'?`${a.score}점`:[a.correct!=null?`${a.correct}/${a.total}`:'',a.score!=null?`${a.score}점`:''].filter(Boolean).join(' · ')||'채점됨'}</span>`;
   if(a.status==='submitted') return `<span class="st done">완료 · 채점 전</span>`;
   const d=diff(a.due,TODAY);
   if(d<0&&a.type!=='숙제평가') return `<span class="st">채점 전</span>`;
@@ -605,7 +605,7 @@ function tWork(){
 
 function tGrade(a){
   const rs=Object.entries(RESULTS[a.id]||{}).filter(([sid])=>stu(+sid));
-  const unit=a.type==='단원평가';
+  const unit=a.type==='단원평가', mx=a.max??100;
   const bl=gradeBack?.kind==='detail'?`${esc(stu(gradeBack.sid)?.name||'')} 페이지`:gradeBack?.kind==='lesson'?'수업 페이지':gradeBack?.kind==='today'?'오늘':'과제 목록';
   return `<div class="head"><button class="undo" data-ungrade="1" style="padding:0">← ${bl}</button><h1>${esc(a.title)}</h1>
     <div class="sub">${a.subj} · ${a.type} · ${esc(a.unit)} · 마감 ${mdw(a.due)} · ${a.total}문항</div></div>
@@ -613,17 +613,18 @@ function tGrade(a){
   ${unit?`<section class="card"><h2>단원평가 평균</h2><div class="form">
     <label>전국 평균<input name="nat" type="number" step="0.1" value="${a.nat??''}"></label>
     <label>경남 평균<input name="gn" type="number" step="0.1" value="${a.gn??''}"></label>
-    <label>만점<input value="${a.max}" disabled></label></div></section>`:''}
+    <label>만점<input value="${a.max}" disabled></label></div></section>`:`<section class="card"><h2>점수 <small>선택 · 안 쓰면 비워 두세요</small></h2><div class="form">
+    <label>만점<input name="max" type="number" min="1" step="0.1" value="${mx}"></label></div></section>`}
   <section class="card"><h2>채점표 <small>맞은 문항 수 입력 → 정답률 자동</small></h2>
-    <div class="scroll"><table><thead><tr><th>학생</th><th>상태</th><th class="num">맞은 수</th>${unit?'<th class="num">점수</th>':''}<th class="num">정답률</th></tr></thead><tbody>
+    <div class="scroll"><table><thead><tr><th>학생</th><th>상태</th><th class="num">맞은 수</th><th class="num">점수</th><th class="num">정답률</th></tr></thead><tbody>
     ${rs.map(([sid,r])=>{const s=stu(+sid), rt=r.correct!=null?Math.round(r.correct/a.total*1000)/10:null;
       const st=r.status==='graded'?'<span class="st done">채점됨</span>':r.status==='submitted'?`<span class="st done">완료 ${fmtAt(r.doneAt)}</span>`:(a.type==='숙제평가'&&a.due<TODAY?'<span class="st late">미완료</span>':'<span class="muted">-</span>');
       return `<tr${+sid===gradeHl?' class="hl" id="hlrow"':''}><td><b>${esc(s.name)}</b></td><td>${st}</td>
         <td class="num"><input class="gin" name="c_${sid}" data-total="${a.total}" data-r="r_${sid}" type="number" min="0" max="${a.total}" inputmode="numeric" value="${r.correct??''}" aria-label="${esc(s.name)} 맞은 수"> / ${a.total}</td>
-        ${unit?`<td class="num"><input class="gin" name="s_${sid}" type="number" min="0" max="${a.max}" step="0.1" value="${r.score??''}" aria-label="${esc(s.name)} 점수"></td>`:''}
+        <td class="num"><input class="gin" name="s_${sid}" type="number" min="0" max="${unit?a.max:mx}" step="0.1" value="${r.score??''}" aria-label="${esc(s.name)} 점수"></td>
         <td class="num" id="r_${sid}"${rt!=null&&rt<=50?' style="color:var(--bad);font-weight:700"':''}>${rt!=null?rt+'%':'-'}</td></tr>`}).join('')}
     </tbody></table></div>
-    <p class="muted">빈칸은 채점하지 않은 걸로 둬요. 정답률 50% 이하는 학생 화면 "보충 필요 항목"에 자동으로 떠요.</p>
+    <p class="muted">${unit?'':'맞은 수와 점수 중 하나만 넣어도 돼요. '}빈칸은 채점하지 않은 걸로 둬요. 정답률 50% 이하는 학생 화면 "보충 필요 항목"에 자동으로 떠요.</p>
     <button class="btn" style="width:100%">채점 저장</button></section></form>`;
 }
 
@@ -740,7 +741,7 @@ function tStudentDetail(sid){
   <section class="card"><h2>다가오는 수업 <small>수업을 누르면 기록·과제·할일</small></h2>${next.length?next.map(row).join(''):'<div class="empty">일주일 안에 수업이 없어요.</div>'}</section>
   <section class="card"><h2>지난 수업 <small>최근 2주</small></h2>${past.length?past.map(row).join(''):'<div class="empty">지난 2주 수업이 없어요.</div>'}</section>
   <section class="card"><h2>과제 <small>처리할 것부터 · 상태를 누르면 채점표</small></h2>${mine.length?[...mine].sort((a,b)=>pri(a)-pri(b)||(pri(a)===5?b.due.localeCompare(a.due):a.due.localeCompare(b.due))).slice(0,showAllHw?999:8).map(a=>`<div class="srow"><div>${sTag(a.subj)} <span class="tag type">${a.type}</span> ${esc(a.title)}<div class="muted" style="font-size:12px">마감 ${mdw(a.due)}</div></div>
-    <div class="acts" style="align-items:center"><button class="btn sm ghost" data-edithw="${a.id}">편집</button><button class="glink" data-grade="${a.id}" data-hl="${sid}">${a.status==='graded'&&a.correct!=null?`<b${rate(a)<=50?' style="color:var(--bad)"':''}>${rate(a)}%</b>`:a.status==='submitted'?'<span class="st done">완료 · 채점 전</span>':a.type==='숙제평가'&&a.due<TODAY?'<span class="st late">마감 지남 · 미완료</span>':a.due<=TODAY?'<span class="st soon">채점 전</span>':`<span class="muted">${D(a.given)>D(TODAY)?'예정':'진행 중'}</span>`} ›</button></div></div>`).join('')+(mine.length>8&&!showAllHw?`<button class="more" data-allhw="1">과제 ${mine.length}개 모두 보기</button>`:''):'<div class="empty">과제가 없어요. 수업을 눌러 과제를 낼 수 있어요.</div>'}</section>`;
+    <div class="acts" style="align-items:center"><button class="btn sm ghost" data-edithw="${a.id}">편집</button><button class="glink" data-grade="${a.id}" data-hl="${sid}">${a.status==='graded'&&a.correct!=null?`<b${rate(a)<=50?' style="color:var(--bad)"':''}>${rate(a)}%</b>${a.score!=null&&a.type!=='단원평가'?` <span class="muted">${a.score}점</span>`:''}`:a.status==='graded'&&a.score!=null?`<b>${a.score}점</b>`:a.status==='submitted'?'<span class="st done">완료 · 채점 전</span>':a.type==='숙제평가'&&a.due<TODAY?'<span class="st late">마감 지남 · 미완료</span>':a.due<=TODAY?'<span class="st soon">채점 전</span>':`<span class="muted">${D(a.given)>D(TODAY)?'예정':'진행 중'}</span>`} ›</button></div></div>`).join('')+(mine.length>8&&!showAllHw?`<button class="more" data-allhw="1">과제 ${mine.length}개 모두 보기</button>`:''):'<div class="empty">과제가 없어요. 수업을 눌러 과제를 낼 수 있어요.</div>'}</section>`;
 }
 
 function tLessonPage(){
@@ -991,7 +992,7 @@ document.addEventListener('submit',async e=>{
     const maxC=Math.max(0,...Object.values(RESULTS[id]||{}).map(r=>r.correct??0));
     if(!(total>=1)||total<maxC){toast(`문항 수는 이미 채점된 맞은 수(${maxC})보다 작을 수 없어요`);return}
     const row={subject:g('subj'),type:g('type'),title:g('title'),unit:g('unit'),given:g('given'),due:g('due'),total};
-    if(row.type==='단원평가'){row.max=+g('max')||100;row.nat=num(g('nat'));row.gn=num(g('gn'))}else{row.max=null;row.nat=null;row.gn=null}
+    if(row.type==='단원평가'){row.max=+g('max')||100;row.nat=num(g('nat'));row.gn=num(g('gn'))}else{row.max=a.type==='단원평가'?null:a.max;row.nat=null;row.gn=null}
     await save(()=>DB.update('assignments',row,{id}),'과제를 고쳤어요');return}
   if(f.id==='addTargetsForm'){const ts=fd.getAll('t').map(Number);if(!ts.length){toast('추가할 학생을 골라 주세요');return}
     await save(()=>DB.insertMany('results',ts.map(n=>({assignment_id:editHw,student_id:U(n)}))),`${ts.length}명에게 과제를 추가했어요`);return}
@@ -1020,11 +1021,15 @@ document.addEventListener('submit',async e=>{
   if(f.id==='gradeForm'){
     const a=ASSIGN.find(x=>x.id===+f.dataset.id);const ups=[];
     for(const sid of Object.keys(RESULTS[a.id]||{})){
-      const c=num(g('c_'+sid));if(c==null)continue;
-      if(!Number.isInteger(c)||c<0||c>a.total){toast(`${stu(+sid).name}: 맞은 수는 0~${a.total} 정수예요`);return}
-      let sc=null;if(a.type==='단원평가'){sc=num(g('s_'+sid));if(sc==null||sc<0||sc>a.max){toast(`${stu(+sid).name}: 점수를 0~${a.max}로 넣어 주세요`);return}}
+      const c=num(g('c_'+sid)), sc=num(g('s_'+sid)), unit=a.type==='단원평가', mx=unit?a.max:(num(g('max'))??100);
+      if(c==null&&(unit||sc==null))continue;
+      if(c!=null&&(!Number.isInteger(c)||c<0||c>a.total)){toast(`${stu(+sid).name}: 맞은 수는 0~${a.total} 정수예요`);return}
+      if(unit&&sc==null){toast(`${stu(+sid).name}: 점수를 0~${a.max}로 넣어 주세요`);return}
+      if(sc!=null&&(sc<0||sc>mx)){toast(`${stu(+sid).name}: 점수를 0~${mx}로 넣어 주세요`);return}
       ups.push({sid:+sid,correct:c,score:sc})}
+    if(a.type!=='단원평가'){const m=num(g('max'));if(m!=null&&!(m>0)){toast('만점은 0보다 커야 해요');return}}
     await save(async()=>{
+      if(a.type!=='단원평가'&&num(g('max'))!=null&&num(g('max'))!==a.max)await DB.update('assignments',{max:num(g('max'))},{id:a.id});
       if(a.type==='단원평가')await DB.update('assignments',{nat:num(g('nat')),gn:num(g('gn'))},{id:a.id});
       await Promise.all(ups.map(u=>DB.update('results',{status:'graded',correct:u.correct,score:u.score},{assignment_id:a.id,student_id:U(u.sid)})));
     },`${ups.length}명 채점을 저장했어요`);return}
