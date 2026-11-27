@@ -518,7 +518,7 @@ function tToday(){
     <div class="stat"><b>${grading.reduce((s,x)=>s+x.n,0)}</b><span>채점 대기</span></div>
     <div class="stat"><b>${miss.length}</b><span>피드백 미작성</span></div></div></section>
   <section class="card"><h2>오늘 수업</h2>
-    ${Object.values(groups).length?Object.values(groups).map(g=>`<div class="srow"><div><b>${g.time}</b> ${sTag(g.subj)}</div>
+    ${Object.values(groups).length?Object.values(groups).map(g=>`<div class="srow"><div style="min-width:0"><b>${g.time}</b> ${sTag(g.subj)}${(()=>{const tp=[...new Set(g.ids.map(i=>lessonOf(i,TODAY,g.subj)?.topic).filter(Boolean))];return `<div style="font-size:14px;margin-top:3px;${tp.length?'font-weight:600':'color:var(--mute)'}">${tp.length?tp.map(esc).join(' / '):'수업 제목 미입력'}</div>`})()}</div>
       <div class="acts">${g.ids.map(i=>`<button class="btn sm ghost" data-open="${lkey(i,TODAY,g.subj)}">${esc(stu(i).name)}${dayLessons(i,TODAY).some(x=>x.subj===g.subj&&x.extra)?' (보충)':''}</button>`).join('')}</div></div>`).join(''):'<div class="empty">오늘은 수업이 없어요.</div>'}</section>
   <section class="card private"><h2>🔒 오늘까지 할 일 <small>선생님만</small></h2>
     ${TODOS.filter(t=>!t.done&&(!t.due||t.due<=TODAY)).sort((a,b)=>(a.due||'9').localeCompare(b.due||'9')).map(t=>todoRow(t,true)).join('')||'<div class="empty">오늘까지 할 일은 다 했어요.</div>'}
