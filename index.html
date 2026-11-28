@@ -484,7 +484,7 @@ function borine(){
 }
 
 function school(){
-  if(!TERMS.length) return '<section class="card"><div class="empty">아직 학교 성적이 없어요. 선생님이 입력하면 여기에 보여요.</div></section>';
+  if(!TERMS.length) return `<section class="card"><div class="empty">아직 학교 성적이 없어요.${preview?'':' 아래에서 직접 입력해 보세요.'}</div></section>${mySchoolInput()}`;
   const avgOf=r=>{const v=[r.mid,r.fin].filter(x=>x!=null);return v.length?Math.round(v.reduce((a,b)=>a+b,0)/v.length*10)/10:null};
   const pctOf=r=>r.rank&&r.n?Math.round(r.rank/r.n*1000)/10:null;
   const rows=SCHOOL.filter(r=>r.term===term), subs=['영어','수학'].filter(s=>SCHOOL.some(r=>r.subj===s));
@@ -493,7 +493,7 @@ function school(){
     {subj:s,color:col(s),labels:true,values:TERMS.map(t=>avgOf(SCHOOL.find(x=>x.term===t&&x.subj===s)||{}))},
     {subj:s,color:col(s),dash:true,values:TERMS.map(t=>SCHOOL.find(x=>x.term===t&&x.subj===s)?.avg??null)}]);
   const card=r=>{const me=avgOf(r), d=me!=null&&r.avg!=null?me-r.avg:null, p=pctOf(r);
-    return `<section class="card"><div class="rowtop"><h2 style="margin:0">${sTag(r.subj)} ${term}</h2>
+    return `<section class="card"><div class="rowtop"><h2 style="margin:0">${sTag(r.subj)} ${term}${r.byStu?' <i class="b ex">내가 입력 · 확인 전</i>':''}</h2>
       <span class="lv${r.lv?'':' none'}">${r.lv?esc(r.lv)+(/^\d$/.test(r.lv)?'등급':''):'등급 미정'}</span></div>
       <div class="stats" style="margin-top:12px"><div class="stat"><b>${r.mid??'–'}</b><span>중간고사</span></div><div class="stat"><b>${r.fin??'–'}</b><span>기말고사</span></div><div class="stat"><b>${me??'–'}</b><span>내 평균</span></div></div>
       ${r.avg!=null&&me!=null?`<div class="cmp" style="grid-template-columns:64px 1fr 48px;margin-top:12px"><span>내 평균</span><div class="b" style="width:${me}%;background:${col(r.subj)}"></div><span class="v">${me}</span>
@@ -514,7 +514,8 @@ function school(){
   ${rows.map(card).join('')}
   <section class="card"><h2>학기별 추이 <small>학기 평균</small></h2>${lineChart(series,TERMS,{min:lo,max:100,unit:''})}
     <div class="legend">${subs.map(s=>`<span><i style="background:${col(s)}"></i>${s}</span>`).join('')}<span>실선: 내 평균 · 점선: 학교 평균</span></div></section>
-  <section class="card"><h2>변화 분석 <small>직전 학기 대비</small></h2><ul style="margin:0;padding-left:0;list-style:none;display:grid;gap:10px;font-size:15px">${analysis}</ul></section>`;
+  <section class="card"><h2>변화 분석 <small>직전 학기 대비</small></h2><ul style="margin:0;padding-left:0;list-style:none;display:grid;gap:10px;font-size:15px">${analysis}</ul></section>
+  ${mySchoolInput()}`;
 }
 
 function grades(){
@@ -686,26 +687,40 @@ function tGrade(a){
     <button class="btn" style="width:100%">채점 저장</button></section></form>`;
 }
 
-function tSchool(){
-  const rows=ALL_SCHOOL.filter(r=>r.sid===schoolSid).sort((a,b)=>TERM_ORDER.indexOf(a.term)-TERM_ORDER.indexOf(b.term)||a.subj.localeCompare(b.subj));
-  const v=x=>x??'';
-  return `<div class="head"><h1>학교 성적</h1><div class="sub">선생님만 입력 · 학생은 보기만 해요</div></div>
-  <section class="card"><label class="fl">학생<select id="schoolSid">${STUDENTS.map(s=>`<option value="${s.id}"${s.id===schoolSid?' selected':''}>${esc(s.name)} (${esc(s.grade)})</option>`).join('')}</select></label></section>
-  <section class="card"><h2>점수 기록 <small>같은 학기·과목은 덮어써요</small></h2><form id="schoolForm" class="form">
-    <label>학기<select name="term">${TERM_ORDER.map(t=>`<option${t===(rows.at(-1)?.term||'중1-1')?' selected':''}>${t}</option>`).join('')}</select></label>
+function schoolFields(defTerm){return `<label>학기<select name="term">${TERM_ORDER.map(t=>`<option${t===defTerm?' selected':''}>${t}</option>`).join('')}</select></label>
     <label>과목<select name="subj"><option>영어</option><option>수학</option></select></label>
     <label>중간고사<input name="mid" type="number" min="0" max="100" step="0.1"></label>
     <label>기말고사<input name="fin" type="number" min="0" max="100" step="0.1"></label>
     <label>과목 학교 평균<input name="avg" type="number" min="0" max="100" step="0.1"></label>
     <label>등급 / 성취도<input name="lv" maxlength="3" placeholder="A 또는 2"></label>
     <label>석차<input name="rank" type="number" min="1" placeholder="21"></label>
-    <label>수강자 수<input name="n" type="number" min="1" placeholder="212"></label>
+    <label>수강자 수<input name="n" type="number" min="1" placeholder="212"></label>`}
+// 학생이 직접 입력하는 학교 성적 (선생님이 확인하기 전까지 '학생 입력'으로 표시)
+function mySchoolInput(){
+  if(preview)return '';
+  const mine=SCHOOL.filter(r=>r.byStu).sort((a,b)=>TERM_ORDER.indexOf(a.term)-TERM_ORDER.indexOf(b.term));
+  const v=x=>x??'–';
+  return `<details class="card"${!TERMS.length?' open':''}><summary><b>내 학교 성적 입력하기</b></summary>
+    <form id="mySchoolForm" class="form" style="margin-top:12px">${schoolFields(SCHOOL.at(-1)?.term||(()=>{const g=ME.grade||'';const i=TERM_ORDER.findIndex(t=>t.startsWith(g));return i<0?'중1-1':TERM_ORDER[i]})())}
+      <button class="btn full">저장</button></form>
+    <p class="muted" style="margin:8px 0 0">시험지·성적표를 보고 정확히 넣어 주세요. 선생님이 확인하면 '확인됨'으로 바뀌고, 그다음엔 선생님만 고칠 수 있어요.</p>
+    ${mine.length?`<div style="margin-top:10px">${mine.map(r=>`<div class="srow"><button class="glink" style="flex:1;text-align:left;white-space:normal" data-editmyschool="${r.term}|${r.subj}">
+      <b>${r.term}</b> ${sTag(r.subj)} <span class="muted">중간 ${v(r.mid)} · 기말 ${v(r.fin)} · 평균 ${v(r.avg)} · 등급 ${esc(r.lv)||'–'}</span></button>
+      <button class="btn sm danger" data-delmyschool="${r.term}|${r.subj}" aria-label="삭제">${armed==='ms'+r.term+r.subj?'정말?':'×'}</button></div>`).join('')}</div>`:''}</details>`;
+}
+function tSchool(){
+  const rows=ALL_SCHOOL.filter(r=>r.sid===schoolSid).sort((a,b)=>TERM_ORDER.indexOf(a.term)-TERM_ORDER.indexOf(b.term)||a.subj.localeCompare(b.subj));
+  const v=x=>x??'';
+  return `<div class="head"><h1>학교 성적</h1><div class="sub">학생도 직접 입력할 수 있어요 · 선생님이 저장하거나 확인하면 '확인됨'</div></div>
+  <section class="card"><label class="fl">학생<select id="schoolSid">${STUDENTS.map(s=>`<option value="${s.id}"${s.id===schoolSid?' selected':''}>${esc(s.name)} (${esc(s.grade)})</option>`).join('')}</select></label></section>
+  <section class="card"><h2>점수 기록 <small>같은 학기·과목은 덮어써요</small></h2><form id="schoolForm" class="form">
+    ${schoolFields(rows.at(-1)?.term||'중1-1')}
     <button class="btn full">저장</button></form>
     <p class="muted" style="margin:8px 0 0">빈칸은 비워 둬도 돼요. 중학교는 석차 없이 성취도(A~E)만, 고등학교는 석차등급과 석차를 넣으면 돼요.</p></section>
   <section class="card"><h2>${esc(stu(schoolSid)?.name||'')} 기록 <small>줄을 누르면 수정</small></h2>
     ${rows.length?rows.map(r=>`<div class="srow"><button class="glink" style="flex:1;text-align:left;white-space:normal" data-editschool="${r.term}|${r.subj}">
-      <b>${r.term}</b> ${sTag(r.subj)} <span class="muted">중간 ${v(r.mid)||'–'} · 기말 ${v(r.fin)||'–'} · 학교평균 ${v(r.avg)||'–'} · 등급 ${esc(r.lv)||'–'} · 석차 ${r.rank?r.rank+'/'+(r.n||'?'):'–'}</span></button>
-      <button class="btn sm danger" data-delschool="${r.sid}|${r.term}|${r.subj}" aria-label="삭제">×</button></div>`).join(''):'<div class="empty">아직 기록이 없어요.</div>'}
+      <b>${r.term}</b> ${sTag(r.subj)}${r.byStu?' <i class="b ex">학생 입력</i>':''} <span class="muted">중간 ${v(r.mid)||'–'} · 기말 ${v(r.fin)||'–'} · 학교평균 ${v(r.avg)||'–'} · 등급 ${esc(r.lv)||'–'} · 석차 ${r.rank?r.rank+'/'+(r.n||'?'):'–'}</span></button>
+      ${r.byStu?`<button class="btn sm" data-okschool="${r.sid}|${r.term}|${r.subj}">확인</button>`:''}<button class="btn sm danger" data-delschool="${r.sid}|${r.term}|${r.subj}" aria-label="삭제">×</button></div>`).join(''):'<div class="empty">아직 기록이 없어요.</div>'}
     <button class="more" data-preview="${schoolSid}" data-pg="school">이 학생 화면에서 보기</button></section>`;
 }
 // ===== 학생별 페이지 · 수업 페이지 · 내 할일 (선생님 전용) =====
@@ -910,14 +925,14 @@ async function loadAll(){
   ASSIGN.length=0;AS.forEach(r=>ASSIGN.push({id:r.id,subj:r.subject,type:r.type,title:r.title,unit:r.unit||'',given:r.given,due:r.due,total:r.total,max:nn(r.max),nat:nn(r.nat),gn:nn(r.gn)}));
   for(const k in RESULTS)delete RESULTS[k];ASSIGN.forEach(a=>RESULTS[a.id]={});
   RE.forEach(r=>{(RESULTS[r.assignment_id]??={})[N(r.student_id)]={status:r.status,doneAt:localAt(r.done_at),correct:r.correct,score:nn(r.score)}});
-  ALL_SCHOOL.length=0;SG.forEach(r=>ALL_SCHOOL.push({sid:N(r.student_id),term:r.term,subj:r.subject,mid:nn(r.mid),fin:nn(r.fin),avg:nn(r.avg),lv:r.lv||'',rank:r.rank,n:r.n}));
+  ALL_SCHOOL.length=0;SG.forEach(r=>ALL_SCHOOL.push({sid:N(r.student_id),term:r.term,subj:r.subject,mid:nn(r.mid),fin:nn(r.fin),avg:nn(r.avg),lv:r.lv||'',rank:r.rank,n:r.n,byStu:!!r.by_student}));
   TODOS=TD.map(r=>({id:r.id,sid:N(r.student_id),date:r.lesson_date,subj:r.subject,text:r.text,due:r.due,done:r.done,doneAt:localAt(r.done_at)}));
   if(!stu(schoolSid))schoolSid=STUDENTS[0]?.id??null;
 }
 // 저장 → 다시 불러오기 → 화면 갱신. 실패하면 이유를 보여 줘요
 async function save(fn,msg){
   try{const out=await fn();await loadAll();if(role==='student'||preview)load(curSid);const m=typeof msg==='function'?msg(out):msg;render();if(m)toast(m);return true}
-  catch(e){console.error(e);toast('저장하지 못했어요: '+(e.message||e));try{await loadAll()}catch(_){}render();return false}
+  catch(e){console.error(e);const m=String(e.message||e);toast(/row-level security|RLS|permission/i.test(m)?'저장하지 못했어요. 선생님이 이미 확인했거나 바꿀 권한이 없는 내용이에요.':'저장하지 못했어요: '+m);try{await loadAll()}catch(_){}render();return false}
 }
 
 // ===================== 로그인 =====================
@@ -1124,11 +1139,19 @@ document.addEventListener('submit',async e=>{
       if(a.type==='단원평가')await DB.update('assignments',{nat:num(g('nat')),gn:num(g('gn'))},{id:a.id});
       await Promise.all(ups.map(u=>DB.update('results',{status:'graded',correct:u.correct,score:u.score},{assignment_id:a.id,student_id:U(u.sid)})));
     },`${ups.length}명 채점을 저장했어요`);return}
+  if(f.id==='mySchoolForm'){
+    const rec={mid:num(g('mid')),fin:num(g('fin')),avg:num(g('avg')),lv:g('lv').toUpperCase(),rank:num(g('rank')),n:num(g('n'))};
+    if(rec.mid==null&&rec.fin==null){toast('중간이나 기말 점수를 넣어 주세요');return}
+    if([rec.mid,rec.fin,rec.avg].some(x=>x!=null&&(x<0||x>100))){toast('점수는 0~100으로 넣어 주세요');return}
+    if(rec.rank!=null&&rec.n!=null&&rec.rank>rec.n){toast('석차가 수강자 수보다 커요');return}
+    const ex=SCHOOL.find(x=>x.term===g('term')&&x.subj===g('subj'));
+    if(ex&&!ex.byStu){toast('선생님이 확인한 성적은 선생님만 고칠 수 있어요');return}
+    term=g('term');await save(()=>DB.upsert('school_grades',[{student_id:U(curSid),term:g('term'),subject:g('subj'),...rec,by_student:true}],'student_id,term,subject'),'학교 성적을 저장했어요');return}
   if(f.id==='schoolForm'){if(!schoolSid){toast('먼저 학생을 등록해 주세요');return}
     const rec={mid:num(g('mid')),fin:num(g('fin')),avg:num(g('avg')),lv:g('lv').toUpperCase(),rank:num(g('rank')),n:num(g('n'))};
     if(rec.mid==null&&rec.fin==null){toast('중간이나 기말 점수를 넣어 주세요');return}
     if(rec.rank!=null&&rec.n!=null&&rec.rank>rec.n){toast('석차가 수강자 수보다 커요');return}
-    await save(()=>DB.upsert('school_grades',[{student_id:U(schoolSid),term:g('term'),subject:g('subj'),...rec}],'student_id,term,subject'),'학교 성적을 저장했어요');return}
+    await save(()=>DB.upsert('school_grades',[{student_id:U(schoolSid),term:g('term'),subject:g('subj'),...rec,by_student:false}],'student_id,term,subject'),'학교 성적을 저장했어요');return}
   }finally{if(btn&&document.body.contains(btn))btn.disabled=false}
 });
 document.addEventListener('click',async e=>{
@@ -1207,6 +1230,11 @@ document.addEventListener('click',async e=>{
   if(d.delhw){const k='h'+d.delhw;if(armed!==k){armed=k;render();return}armed=null;editHw=null;await save(()=>DB.remove('assignments',{id:+d.delhw}),'과제를 삭제했어요');return}
   if(d.editschool){const[t,sj]=d.editschool.split('|'),r=ALL_SCHOOL.find(x=>x.sid===schoolSid&&x.term===t&&x.subj===sj),f=document.getElementById('schoolForm');
     if(r&&f){f.elements.term.value=t;f.elements.subj.value=sj;['mid','fin','avg','lv','rank','n'].forEach(k=>f.elements[k].value=r[k]??'');f.scrollIntoView({block:'start'});toast(`${t} ${sj} 수정 중`)}return}
+  if(d.okschool){const[sid,t,sj]=d.okschool.split('|');await save(()=>DB.update('school_grades',{by_student:false},{student_id:U(+sid),term:t,subject:sj}),'확인했어요. 이제 학생은 이 성적을 고칠 수 없어요');return}
+  if(d.editmyschool){const[t,sj]=d.editmyschool.split('|'),r=SCHOOL.find(x=>x.term===t&&x.subj===sj),f=document.getElementById('mySchoolForm');
+    if(r&&f){f.elements.term.value=t;f.elements.subj.value=sj;['mid','fin','avg','lv','rank','n'].forEach(k=>f.elements[k].value=r[k]??'');f.scrollIntoView({block:'start'});toast(`${t} ${sj} 수정 중`)}return}
+  if(d.delmyschool){const k='ms'+d.delmyschool.replace('|','');if(armed!==k){armed=k;render();return}armed=null;const[t,sj]=d.delmyschool.split('|');
+    await save(()=>DB.remove('school_grades',{student_id:U(curSid),term:t,subject:sj}),'지웠어요');return}
   if(d.delschool){const[sid,t,s]=d.delschool.split('|');await save(()=>DB.remove('school_grades',{student_id:U(+sid),term:t,subject:s}));return}
   // 학생 화면 이동
   if(d.tab)goTab(d.tab);
