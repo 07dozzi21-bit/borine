@@ -1336,6 +1336,15 @@ function installCard(){
 ['gesturestart','gesturechange','gestureend'].forEach(ev=>document.addEventListener(ev,e=>e.preventDefault(),{passive:false}));
 document.addEventListener('touchmove',e=>{if(e.touches&&e.touches.length>1)e.preventDefault()},{passive:false});
 // ===================== 시작 =====================
+// 새 버전 자동 적용: 앱을 다시 볼 때(백그라운드→앞으로) 서버의 화면 파일이 바뀌었으면 새로고침
+let __ver=null;
+const verOf=async()=>{try{const t=await (await fetch(location.pathname.replace(/[^/]*$/,'')+'index.html',{cache:'no-store'})).text();let h=0;for(let i=0;i<t.length;i++)h=(h*31+t.charCodeAt(i))|0;return h}catch(_){return null}};
+async function checkUpdate(){const v=await verOf();if(v==null)return;if(__ver==null){__ver=v;return}
+  if(v!==__ver){const busyNow=document.activeElement&&/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)||todoSheet;
+    if(busyNow)return;toast('새 버전으로 바꾸는 중…');setTimeout(()=>location.reload(),600)}}
+checkUpdate();
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')checkUpdate()});
+setInterval(()=>{if(document.visibilityState==='visible')checkUpdate()},30*60*1000);
 if('serviceWorker' in navigator)navigator.serviceWorker.register('./sw.js',{updateViaCache:'none'}).then(r=>r.update()).catch(()=>{});
 addEventListener('hashchange',()=>location.reload());
 (async()=>{
