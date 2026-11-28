@@ -289,6 +289,22 @@ function stat(a){
   return `<span class="st ${d<=1?'soon':''}">${d===0?'오늘 마감':'D-'+d}</span>`;
 }
 let sLesson=null, sBack=null;
+let ALL_ACCESS=[];
+// 접속 기록 (선생님만 봄): 학생 앱을 열 때 시각·홈 화면 앱 여부·기기 종류만 남김. 같은 방식은 10분에 한 번만 기록(서버에서)
+function logAccess(){if(role!=='student'||preview)return;const ua=navigator.userAgent||'';
+  const sa=!!((window.matchMedia&&matchMedia('(display-mode: standalone)').matches)||navigator.standalone===true);
+  const pf=/iPhone|iPad|iPod/.test(ua)?'iOS':/Android/.test(ua)?'Android':/Macintosh/.test(ua)?'Mac':/Windows/.test(ua)?'Windows':'기타';
+  const inapp=/KAKAOTALK|NAVER\(inapp|Instagram|FBAN|FBAV|Line\//i.test(ua);
+  DB.rpc('log_access',{p_standalone:sa,p_platform:pf,p_inapp:inapp}).catch(()=>{})}
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')logAccess()});
+const agoTxt=at=>{if(!at)return '';const m=Math.round((Date.now()-new Date(at.replace(' ','T')))/60000);return m<1?'방금':m<60?m+'분 전':m<1440?Math.round(m/60)+'시간 전':Math.round(m/1440)+'일 전'};
+const howTxt=x=>x.sa?'홈 화면 앱':x.inapp?'메신저 안 브라우저':'브라우저';
+function accessCard(sid){const xs=ALL_ACCESS.filter(x=>x.sid===sid), last=xs[0], app=xs.find(x=>x.sa);
+  return `<section class="card private"><h2>🔒 접속 기록 <small>선생님만 · 최근 60일</small></h2>
+    ${xs.length?`<div class="row"><span>최근 접속</span><b>${last.at.slice(5).replace('-','/')} <span class="muted" style="font-weight:400">(${agoTxt(last.at)})</span></b></div>
+    <div class="row"><span>홈 화면 앱</span><b>${app?`설치함 <span class="muted" style="font-weight:400">· 마지막 ${app.at.slice(5,10).replace('-','/')}</span>`:'<span style="color:var(--bad)">아직 안 씀</span>'}</b></div>
+    <details style="margin-top:6px"><summary class="muted">최근 기록 ${Math.min(xs.length,20)}개</summary>${xs.slice(0,20).map(x=>`<div class="row" style="font-size:14px"><span>${x.at.slice(5).replace('-','/')}</span><span class="muted">${howTxt(x)} · ${esc(x.pf)}</span></div>`).join('')}</details>`
+    :'<div class="empty" style="padding:6px 0">아직 기록이 없어요. 학생이 앱을 열면 남아요.</div>'}</section>`}
 let ALL_MAKEUPS=[], ALL_MEMOS=[], memoEdit=null;
 const MEMO_CATS=['방학','특이사항','비고'], MEMO_LABEL={'방학':'방학 때 할 것','특이사항':'특이사항','비고':'비고'};
 // 학생별 메모: 선생님·학생 모두 보고 쓸 수 있음. 학생은 자기가 쓴 것만 고치거나 지울 수 있음
@@ -593,7 +609,7 @@ function tStudents(){
   <section class="card"><h2>학생 목록 <small>${gradeFil==='전체'?'':gradeFil}</small></h2>    ${STUDENTS.filter(x=>gradeFil==='전체'||(gradeFil==='기타'?!GRADES.includes(x.grade):x.grade===gradeFil)).sort((a,b)=>gIdx(a.grade)-gIdx(b.grade)||a.name.localeCompare(b.name,'ko')).map(s=>{const td=TODOS.filter(t=>t.sid===s.id&&!t.done).length, nx=(()=>{for(let i=0;i<8;i++){const d=add(TODAY,i);const o=dayLessons(s.id,d).filter(x=>!(i===0&&x.time<=NOW_TIME))[0];if(o)return {d,...o}}})();
       return `<button class="lrow" data-sdetail="${s.id}"><span style="flex:1;text-align:left"><b>${esc(s.name)}</b> <span class="muted">${esc(s.grade)}</span>
       <span style="display:block;font-size:13px;color:var(--mute)">${s.subjects.join('·')}${nx?` · 다음 수업 ${mdw(nx.d)} ${nx.time} ${nx.subj}`:''}</span></span>
-      <span class="badges">${td?`<i class="b todo">할일 ${td}</i>`:''}</span><span aria-hidden="true" style="color:var(--mute)">›</span></button>`}).join('')}</section>
+      <span class="badges">${td?`<i class="b todo">할일 ${td}</i>`:''}${ALL_ACCESS.some(x=>x.sid===s.id&&x.sa)?'<i class="b ok">앱</i>':''}</span><span aria-hidden="true" style="color:var(--mute)">›</span></button>`}).join('')}</section>
   <details class="card"><summary><b>학생 등록</b></summary><div style="margin-top:12px">
     <form id="stuForm" class="form">
       <label>이름<input name="name" required></label><label>학교<input name="school"></label>
@@ -830,7 +846,8 @@ function tStudentDetail(sid){
   <section class="card"><h2>지난 수업 <small>최근 2주</small></h2>${past.length?past.map(row).join(''):'<div class="empty">지난 2주 수업이 없어요.</div>'}</section>
   <section class="card"><h2>과제 <small>처리할 것부터 · 상태를 누르면 채점표</small></h2>${mine.length?[...mine].sort((a,b)=>pri(a)-pri(b)||(pri(a)===5?b.due.localeCompare(a.due):a.due.localeCompare(b.due))).slice(0,showAllHw?999:8).map(a=>`<div class="srow"><div>${sTag(a.subj)} <span class="tag type">${a.type}</span> ${esc(a.title)}<div class="muted" style="font-size:12px">마감 ${mdw(a.due)}</div></div>
     <div class="acts" style="align-items:center"><button class="btn sm ghost" data-edithw="${a.id}">편집</button><button class="glink" data-grade="${a.id}" data-hl="${sid}">${a.status==='graded'&&a.correct!=null?`<b${rate(a)<=50?' style="color:var(--bad)"':''}>${rate(a)}%</b>${a.score!=null&&a.type!=='단원평가'?` <span class="muted">${a.score}점</span>`:''}`:a.status==='graded'&&a.score!=null?`<b>${a.score}점</b>`:a.status==='submitted'?'<span class="st done">완료 · 채점 전</span>':a.type==='숙제평가'&&a.due<TODAY?'<span class="st late">마감 지남 · 미완료</span>':a.due<=TODAY?'<span class="st soon">채점 전</span>':`<span class="muted">${D(a.given)>D(TODAY)?'예정':'진행 중'}</span>`} ›</button></div></div>`).join('')+(mine.length>8&&!showAllHw?`<button class="more" data-allhw="1">과제 ${mine.length}개 모두 보기</button>`:''):'<div class="empty">과제가 없어요. 수업을 눌러 과제를 낼 수 있어요.</div>'}</section>
-  ${memoCard(sid,'teacher')}`;
+  ${memoCard(sid,'teacher')}
+  ${accessCard(sid)}`;
 }
 
 function tLessonPage(){
@@ -906,6 +923,7 @@ const DB=window.__FAKE_DB__||{
   async upsert(t,rows,onConflict){const {error}=await this.sb.from(t).upsert(rows,{onConflict});if(error)throw error},
   async update(t,patch,match){let q=this.sb.from(t).update(patch);for(const[k,v] of Object.entries(match))q=q.eq(k,v);const {error}=await q;if(error)throw error},
   async remove(t,match){let q=this.sb.from(t).delete();for(const[k,v] of Object.entries(match))q=q.eq(k,v);const {error}=await q;if(error)throw error},
+  async since(t,col,v){let out=[],from=0;for(;;){const {data,error}=await this.sb.from(t).select('*').gte(col,v).order(col,{ascending:false}).range(from,from+999);if(error)throw error;out=out.concat(data);if(data.length<1000)break;from+=1000}return out},
   async rpc(fn,args){const {data,error}=await this.sb.rpc(fn,args);if(error)throw error;return data},
   async api(path,body){const {data}=await this.sb.auth.getSession();const tk=data.session?.access_token;
     const r=await fetch(`${SB_URL}/functions/v1/api/${path}`,{method:body?'POST':'GET',headers:{'content-type':'application/json',apikey:SB_KEY,...(tk?{'x-user-token':tk}:{})},body:body?JSON.stringify(body):undefined});
@@ -927,6 +945,8 @@ const linkUrl=n=>LINKS[n]?`${location.origin}${location.pathname}#t=${LINKS[n]}`
 async function loadAll(){
   const [P,SC,LE,AS,RE,SG,MK]=await Promise.all(['profiles','schedules','lessons','assignments','results','school_grades','makeup_lessons'].map(t=>DB.rows(t)));
   const MM=await DB.rows('student_memos').catch(()=>[]);
+  const AL=role==='teacher'?await (DB.since?DB.since('access_log','at',add(TODAY,-60)):DB.rows('access_log')).catch(()=>[]):[];
+  ALL_ACCESS=AL.map(r=>({sid:N(r.student_id),at:localAt(r.at)||'',sa:!!r.standalone,pf:r.platform||'',inapp:!!r.inapp})).sort((a,b)=>b.at.localeCompare(a.at));
   const TD=role==='teacher'?await DB.rows('teacher_todos'):[];
   LINKS={};if(role==='teacher')(await DB.rows('student_links')).forEach(r=>{LINKS[N(r.student_id)]=r.token});
   const studs=P.filter(p=>p.role==='student');
@@ -1025,7 +1045,7 @@ async function enter(){
   role=p.role==='admin'?'teacher':'student';MYUID=p.id;
   view.innerHTML=splash();bar.hidden=true;const t0=Date.now();
   try{await loadAll();if(role==='student'){const w=1600-(Date.now()-t0);if(w>0)await new Promise(r=>setTimeout(r,w))}}catch(e){view.innerHTML=`<section class="card" style="margin-top:20vh"><b>불러오지 못했어요</b><p class="muted">${esc(e.message)}</p><button class="btn" data-logout="1">처음으로</button></section>`;busy=false;return}
-  if(role==='student'){curSid=N(p.id);load(curSid);tab='home'}else{ttab='today'}
+  if(role==='student'){curSid=N(p.id);load(curSid);tab='home';logAccess()}else{ttab='today'}
   busy=false;render();window.scrollTo(0,0);
 }
 async function logout(){
