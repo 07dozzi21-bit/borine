@@ -247,7 +247,7 @@ function slotPanel(){
 }
 const TERM_ORDER=['중1-1','중1-2','중2-1','중2-2','중3-1','중3-2','고1-1','고1-2','고2-1','고2-2','고3-1','고3-2'];
 let role=null, preview=false, curSid=null, pick=null, pin='', shake=false;
-let A=[],SCHEDULE=[],LESSONS=[],SCHOOL=[],TERMS=[],ME={};
+let A=[],SCHEDULE=[],LESSONS=[],SCHOOL=[],TERMS=[],ME={},MOCK=[],ALL_MOCK=[],schoolMode='school';
 let tab='home', hwMode='day', hwDate=TODAY, gTab='borine', gPer='전체', gSubs={영어:true,수학:true}, rDate=TODAY, term=null;
 let showPastList=false, ttab='today', lMode='sched', logDate=TODAY, hwView='list', gradeId=null, schoolSid=null, armed=null;
 function load(sid){
@@ -256,6 +256,7 @@ function load(sid){
   SCHEDULE=ALL_SCHEDULE.filter(x=>x.sid===sid).sort((a,b)=>((a.dow+6)%7)-((b.dow+6)%7)||a.time.localeCompare(b.time));
   LESSONS=ALL_LESSONS.filter(x=>x.sid===sid).sort((a,b)=>b.date.localeCompare(a.date));
   SCHOOL=ALL_SCHOOL.filter(x=>x.sid===sid);
+  MOCK=ALL_MOCK.filter(x=>x.sid===sid);
   TERMS=TERM_ORDER.filter(t=>SCHOOL.some(r=>r.term===t));
   if(!TERMS.includes(term))term=TERMS[TERMS.length-1]||null;
 }
@@ -273,7 +274,7 @@ const TTABS=[
   {id:'students',label:'학생',icon:'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c1-3.5 3.5-5 6.5-5s5.5 1.5 6.5 5M16 4.6a3.5 3.5 0 0 1 0 6.8M18 15c2 .6 3.2 2.2 3.8 5"/>'},
   {id:'lessons',label:'수업',icon:'<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/>'},
   {id:'work',label:'과제',icon:'<path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 14l2 2 4-4"/>'},
-  {id:'school',label:'학교성적',icon:'<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>'}
+  {id:'school',label:'성적',icon:'<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>'}
 ];
 const view=document.getElementById('view'), bar=document.getElementById('tabbar');
 
@@ -546,8 +547,8 @@ function school(){
 
 function grades(){
   return `<div class="head"><h1>성적</h1></div>
-  <div class="seg" role="group" aria-label="성적 종류">${[['borine','보리네 성적'],['school','학교 성적']].map(([k,l])=>`<button data-g="${k}" aria-pressed="${gTab===k}">${l}</button>`).join('')}</div>
-  ${gTab==='borine'?borine():school()}`;
+  <div class="seg" role="group" aria-label="성적 종류">${[['borine','보리네'],['school','학교'],['mock','모의고사']].map(([k,l])=>`<button data-g="${k}" aria-pressed="${gTab===k}">${l}</button>`).join('')}</div>
+  ${gTab==='borine'?borine():gTab==='mock'?mockView():school()}`;
 }
 
 function my(){
@@ -740,6 +741,47 @@ function tGrade(a){
     <div class="acts"><button class="btn ghost" data-edithw="${a.id}">편집 (학생 빼기)</button><button class="btn danger" data-delhw="${a.id}">${armed==='h'+a.id?'정말 과제 삭제':'과제 삭제'}</button></div></section>`;
 }
 
+// ===== 모의고사 (학평·모평·수능·사설) =====
+const MOCK_KINDS=['학평','모평','수능','사설'];
+const mockLabel=x=>`${String(x.y).slice(2)}.${x.m} ${x.kind}`;
+function mockFields(){const d=D(TODAY),y=d.getFullYear(),m=d.getMonth()+1;
+  return `<label>연도<input name="y" type="number" min="2000" max="2100" value="${y}" required></label>
+    <label>월<select name="m">${[...Array(12)].map((_,i)=>`<option value="${i+1}"${i+1===m?' selected':''}>${i+1}월</option>`).join('')}</select></label>
+    <label>종류<select name="kind">${MOCK_KINDS.map(k=>`<option>${k}</option>`).join('')}</select></label>
+    <label>과목<select name="subj"><option>영어</option><option>수학</option></select></label>
+    <label>원점수<input name="raw" type="number" min="0" max="100" step="0.1"></label>
+    <label>등급<input name="grade" type="number" min="1" max="9" step="1"></label>
+    <label>백분위<input name="pct" type="number" min="0" max="100" step="0.1"></label>
+    <label>표준점수<input name="std" type="number" min="0" max="200" step="0.1"></label>`}
+function mockRec(g){const num2=k=>num(g(k));return {year:num2('y'),month:num2('m'),kind:g('kind'),subject:g('subj'),raw:num2('raw'),grade:num2('grade'),pct:num2('pct'),std:num2('std')}}
+function mockCheck(r){if(!r.year||!r.month){return '연도와 월을 넣어 주세요'}if(r.raw==null&&r.grade==null){return '원점수나 등급 중 하나는 넣어 주세요'}
+  if(r.grade!=null&&!(Number.isInteger(r.grade)&&r.grade>=1&&r.grade<=9))return '등급은 1~9로 넣어 주세요';
+  if(r.raw!=null&&(r.raw<0||r.raw>100))return '원점수는 0~100으로 넣어 주세요';return null}
+function mockList(xs,who){
+  if(!xs.length)return '<div class="empty">아직 모의고사 기록이 없어요.</div>';
+  const groups=[];xs.slice().reverse().forEach(x=>{const k=mockLabel(x);let g=groups.find(z=>z.k===k);if(!g)groups.push(g={k,xs:[]});g.xs.push(x)});
+  return groups.map(g=>`<div style="padding:10px 0;border-top:1px solid var(--line)"><b>${g.k}</b>
+    ${g.xs.map(x=>`<div class="srow" style="border:0;padding:6px 0"><div style="flex:1">${sTag(x.subj)} ${x.grade!=null?`<b>${x.grade}등급</b>`:''} <span class="muted">${[x.raw!=null?`원점수 ${x.raw}`:'',x.pct!=null?`백분위 ${x.pct}`:'',x.std!=null?`표점 ${x.std}`:''].filter(Boolean).join(' · ')}</span>
+      ${x.byStu?` <i class="b ex">${who==='student'?'내가 입력 · 확인 전':'학생 입력'}</i>`:''}</div>
+      ${who==='teacher'?`${x.byStu?`<button class="btn sm" data-okmock="${x.id}">확인</button>`:''}<button class="btn sm ghost" data-editmock="${x.id}">수정</button><button class="btn sm danger" data-delmock="${x.id}">${armed==='mx'+x.id?'정말?':'×'}</button>`
+       :who==='student'&&x.byStu&&!preview?`<button class="btn sm ghost" data-editmymock="${x.id}">수정</button><button class="btn sm danger" data-delmymock="${x.id}">${armed==='mx'+x.id?'정말?':'×'}</button>`:''}</div>`).join('')}</div>`).join('');
+}
+function mockChart(xs){const labels=[...new Set(xs.map(mockLabel))];if(labels.length<2)return '';
+  const subs=['영어','수학'].filter(s=>xs.some(x=>x.subj===s&&x.raw!=null));if(!subs.length)return '';
+  const col=s=>`var(--${s==='영어'?'en':'ma'})`;
+  const short=labels.map(l=>{const [ym]=l.split(' ');return labels.filter(z=>z.startsWith(ym+' ')).length>1?l:ym});
+  return `<section class="card"><h2>원점수 추이</h2>${lineChart(subs.map(s=>({color:col(s),labels:true,values:labels.map(l=>xs.find(x=>x.subj===s&&mockLabel(x)===l)?.raw??null)})),short,{min:0,max:100,unit:''})}
+    <div class="legend">${subs.map(s=>`<span><i style="background:${col(s)}"></i>${s}</span>`).join('')}</div></section>`}
+function mockView(){
+  return `<details class="card"${!MOCK.length||preview?' open':''}><summary><b>모의고사 성적 입력하기</b></summary>
+    ${preview?'<p class="muted" style="margin:10px 0 0;font-weight:700">미리보기라 입력은 막혀 있어요.</p>':''}
+    <form id="myMockForm" class="form" style="margin-top:12px"><fieldset style="display:contents"${preview?' disabled':''}>${mockFields()}<button class="btn full">저장</button></fieldset></form></details>
+  ${mockChart(MOCK)}
+  <section class="card"><h2>모의고사 기록 <small>최근 순</small></h2>${mockList(MOCK,'student')}</section>`;
+}
+function tMock(){const xs=ALL_MOCK.filter(x=>x.sid===schoolSid);
+  return `<section class="card"><h2>모의고사 기록하기 <small>같은 시험·과목은 덮어써요</small></h2><form id="mockForm" class="form">${mockFields()}<button class="btn full">저장</button></form></section>
+  <section class="card"><h2>${esc(stu(schoolSid)?.name||'')} 모의고사</h2>${mockList(xs,'teacher')}</section>`}
 function schoolFields(defTerm){return `<label>학기<select name="term">${TERM_ORDER.map(t=>`<option${t===defTerm?' selected':''}>${t}</option>`).join('')}</select></label>
     <label>과목<select name="subj"><option>영어</option><option>수학</option></select></label>
     <div class="full" style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px"><span class="muted" style="grid-column:1/-1;font-size:13px">점수 (모두 100점 만점)</span>
@@ -770,8 +812,11 @@ function mySchoolInput(){
 function tSchool(){
   const rows=ALL_SCHOOL.filter(r=>r.sid===schoolSid).sort((a,b)=>TERM_ORDER.indexOf(a.term)-TERM_ORDER.indexOf(b.term)||a.subj.localeCompare(b.subj));
   const v=x=>x??'';
-  return `<div class="head"><h1>학교 성적</h1><div class="sub">학생도 직접 입력할 수 있어요 · 선생님이 저장하거나 확인하면 '확인됨'</div></div>
-  <section class="card"><label class="fl">학생<select id="schoolSid">${STUDENTS.map(s=>`<option value="${s.id}"${s.id===schoolSid?' selected':''}>${esc(s.name)} (${esc(s.grade)})</option>`).join('')}</select></label></section>
+  const head=`<div class="head"><h1>성적 관리</h1><div class="sub">학생도 직접 입력할 수 있어요 · 선생님이 저장하거나 확인하면 '확인됨'</div></div>
+  <div class="seg" role="group" aria-label="성적 종류">${[['school','학교 성적'],['mock','모의고사']].map(([k,l])=>`<button data-smode="${k}" aria-pressed="${schoolMode===k}">${l}</button>`).join('')}</div>
+  <section class="card"><label class="fl">학생<select id="schoolSid">${STUDENTS.map(s=>`<option value="${s.id}"${s.id===schoolSid?' selected':''}>${esc(s.name)} (${esc(s.grade)})</option>`).join('')}</select></label></section>`;
+  if(schoolMode==='mock')return head+tMock();
+  return `${head}
   <section class="card"><h2>점수 기록 <small>같은 학기·과목은 덮어써요</small></h2><form id="schoolForm" class="form">
     ${schoolFields(rows.at(-1)?.term||'중1-1')}
     <button class="btn full">저장</button></form>
@@ -985,6 +1030,9 @@ async function loadAll(){
   const [P,SC,LE,AS,RE,SG,MK]=await Promise.all(['profiles','schedules','lessons','assignments','results','school_grades','makeup_lessons'].map(t=>DB.rows(t)));
   const MM=await DB.rows('student_memos').catch(()=>[]);
   const ST=await DB.rows('app_settings').catch(()=>[]);
+  const MX=await DB.rows('mock_exams').catch(()=>[]);
+  ALL_MOCK=MX.map(r=>({id:r.id,sid:N(r.student_id),y:r.year,m:r.month,kind:r.kind,subj:r.subject,raw:nn(r.raw),grade:r.grade,pct:nn(r.pct),std:nn(r.std),byStu:!!r.by_student}))
+    .sort((a,b)=>a.y-b.y||a.m-b.m||a.kind.localeCompare(b.kind)||a.subj.localeCompare(b.subj));
   {const g=(ST.find(r=>r.key==='greeting')?.value||'').split('\n').map(x=>x.trim()).filter(Boolean);GREETS=g.length?g:['오늘도 반가워요'];
    if(!GREETS.includes(GREET))GREET=GREETS[Math.floor(Math.random()*GREETS.length)]}
   const AL=role==='teacher'?await (DB.since?DB.since('access_log','at',add(TODAY,-60)):DB.rows('access_log')).catch(()=>[]):[];
@@ -1156,6 +1204,11 @@ document.addEventListener('submit',async e=>{
   if(f.id==='editStuForm'){const sid=+f.dataset.sid, subjects=fd.getAll('subj');
     if(!g('name')){toast('이름을 넣어 주세요');return}if(!subjects.length){toast('과목을 하나 이상 골라 주세요');return}
     await save(()=>DB.update('profiles',{name:g('name'),school:g('school'),grade:g('grade'),subjects},{id:U(sid)}),'학생 정보를 고쳤어요');return}
+  if(f.id==='myMockForm'||f.id==='mockForm'){const mine=f.id==='myMockForm';if(mine&&preview){toast('미리보기에서는 입력할 수 없어요');return}
+    const r=mockRec(g), err=mockCheck(r);if(err){toast(err);return}
+    const sid=mine?curSid:schoolSid;if(sid==null){toast('먼저 학생을 등록해 주세요');return}
+    if(mine){const ex=MOCK.find(x=>x.y===r.year&&x.m===r.month&&x.kind===r.kind&&x.subj===r.subject);if(ex&&!ex.byStu){toast('선생님이 확인한 성적은 선생님만 고칠 수 있어요');return}}
+    await save(()=>DB.upsert('mock_exams',[{student_id:U(sid),...r,by_student:mine}],'student_id,year,month,kind,subject'),`${String(r.year).slice(2)}.${r.month} ${r.kind} ${r.subject} 저장했어요`);return}
   if(f.id==='stuGreetForm'){const sid=+f.dataset.sid,v=g('g').split('\n').map(x=>x.trim()).filter(Boolean).slice(0,20);if(v.some(x=>x.length>60)){toast('한 줄은 60자 이내로 써 주세요');return}
     await save(()=>DB.update('profiles',{greeting:v.join('\n')},{id:U(sid)}),v.length?`${stu(sid).name} 학생 인사말을 저장했어요`:'전체 인사말을 쓰도록 바꿨어요');return}
   if(f.id==='greetForm'){const v=g('g').split('\n').map(x=>x.trim()).filter(Boolean).slice(0,30);if(v.some(x=>x.length>60)){toast('한 줄은 60자 이내로 써 주세요');return}
@@ -1252,6 +1305,13 @@ document.addEventListener('click',async e=>{
   const b=e.target.closest('button,a[data-open],a[data-sdetail]');if(!b||b.disabled)return;const d=b.dataset;
   // 로그인
   if(d.key){if(busy)return;const k=d.key;if(k==='del')pin=pin.slice(0,-1);else if(pin.length<4)pin+=k;loginErr='';render();if(pin.length===4)setTimeout(tryPin,120);return}
+  if(d.smode){schoolMode=d.smode;render();return}
+  if(d.okmock){await save(()=>DB.update('mock_exams',{by_student:false},{id:+d.okmock}),'확인했어요. 이제 학생은 이 성적을 고칠 수 없어요');return}
+  if(d.editmock||d.editmymock){const x=ALL_MOCK.find(z=>z.id===+(d.editmock||d.editmymock))||MOCK.find(z=>z.id===+d.editmymock),f=document.getElementById(d.editmock?'mockForm':'myMockForm');
+    if(x&&f){const det=f.closest('details');if(det)det.open=true;f.elements.y.value=x.y;f.elements.m.value=x.m;f.elements.kind.value=x.kind;f.elements.subj.value=x.subj;
+      [['raw','raw'],['grade','grade'],['pct','pct'],['std','std']].forEach(([k,v])=>f.elements[k].value=x[v]??'');f.scrollIntoView({block:'start'});toast(`${mockLabel(x)} ${x.subj} 수정 중`)}return}
+  if(d.delmock||d.delmymock){const id=+(d.delmock||d.delmymock),k='mx'+id;if(armed!==k){armed=k;render();return}armed=null;
+    await save(()=>DB.remove('mock_exams',{id}),'지웠어요');return}
   if(d.accfil){accFil=d.accfil;render();return}
   if(d.accesspage){accessPage=true;render();window.scrollTo(0,0);return}
   if(d.accessback){accessPage=false;render();window.scrollTo(0,0);return}
