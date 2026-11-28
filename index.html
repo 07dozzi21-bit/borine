@@ -608,7 +608,7 @@ function tToday(){
       <button class="btn full">저장</button></form></details>`;
 }
 
-let accessPage=false, accFil='전체';
+let mkEdit=false, accessPage=false, accFil='전체';
 // 접속 기록 페이지 (선생님만): 학생별 요약 + 전체 최근 기록
 function tAccess(){
   const week=add(TODAY,-6), byS=STUDENTS.map(s=>{const xs=ALL_ACCESS.filter(x=>x.sid===s.id);
@@ -884,6 +884,13 @@ function tLessonPage(){
   const td=todosOf(sid,date,subj).sort((a,b)=>a.done-b.done);
   return `<div class="head"><button class="undo" data-lback="1" style="padding:0">← ${backTo==='detail'?esc(s.name)+' 페이지':backTo==='today'?'오늘':'수업 목록'}</button>
     <h1>${esc(s.name)} · ${subj} ${dayLessons(sid,date).some(x=>x.subj===subj&&x.extra)?'보충수업':'수업'}</h1><div class="sub">${mdw(date)} ${time}${date===TODAY?' · 오늘':''}</div></div>
+  ${(()=>{const mk=ALL_MAKEUPS.find(m=>m.sid===sid&&m.date===date&&m.subj===subj);if(!mk)return '';
+    return `<details class="card"${mkEdit?' open':''}><summary><b>보충수업 날짜·시간 바꾸기</b> <span class="muted" style="font-size:13px">${mdw(mk.date)} ${mk.time}</span></summary>
+    <form id="mkMoveForm" class="form" data-id="${mk.id}" style="margin-top:12px">
+      <label>날짜<input name="date" type="date" value="${mk.date}" required></label>
+      <label>시간<input name="time" type="time" value="${mk.time}" step="600" required></label>
+      <div class="full acts"><button class="btn" style="flex:2">바꾸기</button><button type="button" class="btn danger" style="flex:1" data-delmakeup="${mk.id}">${armed==='m'+mk.id?'정말 취소':'보충 취소'}</button></div></form>
+    <p class="muted" style="margin:8px 0 0;font-size:13px">날짜를 바꾸면 이 수업 기록·할일, 이 학생에게만 낸 이 날 과제도 같이 옮겨요.</p></details>`})()}
   <section class="card"><h2>수업 기록 <small>학생에게 보여요</small></h2><form id="lessonForm" class="form">
     <label class="full">수업 주제<input name="topic" value="${esc(l.topic||'')}" placeholder="관계대명사 what"></label>
     <label class="full">준비할 것<input name="prep" value="${esc(l.prep||'')}"></label>
@@ -1145,6 +1152,17 @@ document.addEventListener('submit',async e=>{
     await save(()=>DB.update('profiles',{name:g('name'),school:g('school'),grade:g('grade'),subjects},{id:U(sid)}),'학생 정보를 고쳤어요');return}
   if(f.id==='greetForm'){const v=g('g').split('\n').map(x=>x.trim()).filter(Boolean).slice(0,30);if(v.some(x=>x.length>60)){toast('한 줄은 60자 이내로 써 주세요');return}
     GREET=v[0]||'오늘도 반가워요';await save(()=>DB.upsert('app_settings',[{key:'greeting',value:v.join('\n'),updated_at:new Date().toISOString()}],'key'),'인사말을 저장했어요');return}
+  if(f.id==='mkMoveForm'){const mk=ALL_MAKEUPS.find(m=>m.id===+f.dataset.id);if(!mk)return;const nd=g('date'),nt=g('time');if(!nd||!nt){toast('날짜와 시간을 넣어 주세요');return}
+    if(nd===mk.date&&nt===mk.time){toast('바뀐 게 없어요');return}
+    const sid=mk.sid, od=mk.date, sj=mk.subj, regularToo=dayLessons(sid,od).some(x=>x.subj===sj&&!x.extra);
+    if(dayLessons(sid,nd).some(x=>x.subj===sj&&x.time===nt&&x.id!==mk.id)){toast('그 시간에 이미 같은 과목 수업이 있어요');return}
+    const ok=await save(async()=>{await DB.update('makeup_lessons',{date:nd,time:nt},{id:mk.id});
+      if(nd!==od&&!regularToo){
+        if(lessonOf(sid,od,sj)&&!lessonOf(sid,nd,sj))await DB.update('lessons',{date:nd},{student_id:U(sid),date:od,subject:sj});
+        for(const t of todosOf(sid,od,sj))await DB.update('teacher_todos',{lesson_date:nd},{id:t.id});
+        for(const a of ASSIGN.filter(a=>a.given===od&&a.subj===sj&&a.due>=nd&&Object.keys(RESULTS[a.id]||{}).length===1&&RESULTS[a.id][sid]))await DB.update('assignments',{given:nd},{id:a.id});
+      }},`${mdw(nd)} ${nt}로 옮겼어요`);
+    if(ok!==false){mkEdit=false;lessonCtx={sid,date:nd,subj:sj};render()}return}
   if(f.id==='memoForm'){const t=g('text').trim();if(!t){toast('내용을 써 주세요');return}
     await save(()=>DB.insert('student_memos',{student_id:U(+f.dataset.sid),category:g('cat'),text:t}),'메모를 남겼어요');return}
   if(f.id==='memoEditForm'){const t=g('text').trim();if(!t){toast('내용을 써 주세요');return}
@@ -1278,7 +1296,8 @@ document.addEventListener('click',async e=>{
     await save(()=>DB.remove('results',{assignment_id:editHw,student_id:U(n)}),`${stu(n).name} 학생을 이 과제에서 뺐어요`);return}
   if(d.allslot!==undefined&&b.dataset.allslot!==undefined){selSlot=d.allslot||null;render();return}
   if(d.delmakeup){const k='m'+d.delmakeup;if(armed!==k){armed=k;render();return}armed=null;
-    await save(()=>DB.remove('makeup_lessons',{id:+d.delmakeup}),'보충수업을 취소했어요');return}
+    const mk=ALL_MAKEUPS.find(m=>m.id===+d.delmakeup);await save(()=>DB.remove('makeup_lessons',{id:+d.delmakeup}),'보충수업을 취소했어요');
+    if(lessonCtx&&mk&&lessonCtx.date===mk.date&&lessonCtx.sid===mk.sid&&!dayLessons(mk.sid,mk.date).some(x=>x.subj===mk.subj)){lessonCtx=null;render()}return}
   if(d.swapsubj){const x=ALL_SCHEDULE.find(y=>y.id===+d.swapsubj),nx=x.subj==='영어'?'수학':'영어';
     await save(()=>DB.update('schedules',{subject:nx},{id:x.id}),`${stu(x.sid).name} ${nx}(으)로 바꿨어요`);return}
   if(d.slot){const[ctx,dd,t]=d.slot.split('|'),dow=+dd,key=dow+'|'+t;
