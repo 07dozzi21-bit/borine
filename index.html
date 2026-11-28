@@ -547,7 +547,7 @@ function school(){
 
 function grades(){
   return `<div class="head"><h1>성적</h1></div>
-  <div class="seg" role="group" aria-label="성적 종류">${[['borine','보리네'],['school','학교'],['mock','모의고사']].map(([k,l])=>`<button data-g="${k}" aria-pressed="${gTab===k}">${l}</button>`).join('')}</div>
+  <div class="seg" role="group" aria-label="성적 종류">${[['borine','보리네'],['school','학교내신'],['mock','모의고사']].map(([k,l])=>`<button data-g="${k}" aria-pressed="${gTab===k}">${l}</button>`).join('')}</div>
   ${gTab==='borine'?borine():gTab==='mock'?mockView():school()}`;
 }
 
@@ -813,7 +813,7 @@ function tSchool(){
   const rows=ALL_SCHOOL.filter(r=>r.sid===schoolSid).sort((a,b)=>TERM_ORDER.indexOf(a.term)-TERM_ORDER.indexOf(b.term)||a.subj.localeCompare(b.subj));
   const v=x=>x??'';
   const head=`<div class="head"><h1>성적 관리</h1><div class="sub">학생도 직접 입력할 수 있어요 · 선생님이 저장하거나 확인하면 '확인됨'</div></div>
-  <div class="seg" role="group" aria-label="성적 종류">${[['school','학교 성적'],['mock','모의고사']].map(([k,l])=>`<button data-smode="${k}" aria-pressed="${schoolMode===k}">${l}</button>`).join('')}</div>
+  <div class="seg" role="group" aria-label="성적 종류">${[['school','학교내신'],['mock','모의고사']].map(([k,l])=>`<button data-smode="${k}" aria-pressed="${schoolMode===k}">${l}</button>`).join('')}</div>
   <section class="card"><label class="fl">학생<select id="schoolSid">${STUDENTS.map(s=>`<option value="${s.id}"${s.id===schoolSid?' selected':''}>${esc(s.name)} (${esc(s.grade)})</option>`).join('')}</select></label></section>`;
   if(schoolMode==='mock')return head+tMock();
   return `${head}
