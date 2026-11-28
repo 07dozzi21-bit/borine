@@ -289,7 +289,7 @@ function stat(a){
   return `<span class="st ${d<=1?'soon':''}">${d===0?'오늘 마감':'D-'+d}</span>`;
 }
 let sLesson=null, sBack=null;
-let ALL_ACCESS=[];
+let ALL_ACCESS=[], GREETS=['오늘도 반가워요'], GREET='오늘도 반가워요';
 // 접속 기록 (선생님만 봄): 학생 앱을 열 때 시각·홈 화면 앱 여부·기기 종류만 남김. 같은 방식은 10분에 한 번만 기록(서버에서)
 function logAccess(action='접속',detail=''){if(role!=='student'||preview)return;const ua=navigator.userAgent||'';
   const sa=!!((window.matchMedia&&matchMedia('(display-mode: standalone)').matches)||navigator.standalone===true);
@@ -368,7 +368,7 @@ function home(){
   const n=nextLesson(), dd=n?diff(n.day,TODAY):0;
   const todo=A.filter(a=>a.status==='todo'&&D(a.given)<=D(TODAY)&&(a.type==='숙제평가'||a.due>=TODAY)).sort((a,b)=>a.due.localeCompare(b.due));
   const lastFb=LESSONS.find(l=>l.good);
-  return `<div class="head"><div class="sub">${mdw(TODAY)}</div><h1>${esc(ME.name)}님, 오늘도 반가워요</h1></div>${installCard()}
+  return `<div class="head"><div class="sub">${mdw(TODAY)}</div><h1>${esc(ME.name)}님, ${esc(GREET)}</h1></div>${installCard()}
   <section class="card"><h2>다음 수업</h2>${!n?'<div class="empty">예정된 수업이 없어요.</div>':`
     <button class="next lbtn" data-slesson="${n.day}|${n.subj}"><div class="when"><b>${n.time}</b><span>${dd===0?'오늘':dd===1?'내일':mdw(n.day)}</span></div>
     <div style="flex:1;text-align:left"><span class="tag ${n.subj}">${n.subj}</span><div style="font-weight:700;margin-top:4px">${esc(n.topic||'수업 내용 준비 중')}</div>
@@ -600,7 +600,12 @@ function tToday(){
   <section class="card"><h2>마감 지난 미완료 숙제평가</h2>
     ${late.length?late.map(x=>`<button class="lrow" data-grade="${x.a.id}" data-hl="${x.s.id}"><span style="flex:1;text-align:left"><b>${esc(x.s.name)}</b> · ${esc(x.a.title)}<span style="display:block;font-size:13px;color:var(--mute)">마감 ${mdw(x.a.due)}</span></span><span class="st late">${-diff(x.a.due,TODAY)}일 지남</span><span aria-hidden="true" style="color:var(--mute)">›</span></button>`).join(''):'<div class="empty">없어요.</div>'}</section>
   <section class="card"><h2>피드백 미작성 <small>최근 7일</small></h2>
-    ${miss.length?miss.slice(0,8).map(m=>`<div class="srow"><div><b>${esc(stu(m.sid).name)}</b> ${sTag(m.subj)}<div class="muted">${mdw(m.day)} ${m.time}</div></div><button class="btn sm ghost" data-open="${lkey(m.sid,m.day,m.subj)}">작성</button></div>`).join('')+(miss.length>8?`<p class="muted">외 ${miss.length-8}건</p>`:''):'<div class="empty">모두 작성했어요.</div>'}</section>`;
+    ${miss.length?miss.slice(0,8).map(m=>`<div class="srow"><div><b>${esc(stu(m.sid).name)}</b> ${sTag(m.subj)}<div class="muted">${mdw(m.day)} ${m.time}</div></div><button class="btn sm ghost" data-open="${lkey(m.sid,m.day,m.subj)}">작성</button></div>`).join('')+(miss.length>8?`<p class="muted">외 ${miss.length-8}건</p>`:''):'<div class="empty">모두 작성했어요.</div>'}</section>
+  <details class="card"><summary><b>학생 홈 인사말</b> <span class="muted" style="font-size:13px">"이름님, ___"</span></summary>
+    <form id="greetForm" class="form" style="margin-top:12px">
+      <label class="full">인사말 <span style="font-weight:400">(한 줄에 하나 · 여러 줄이면 열 때마다 하나씩 무작위)</span><textarea name="g" rows="4" maxlength="1500" placeholder="오늘도 반가워요">${esc(GREETS.join('\n'))}</textarea></label>
+      <p class="muted full" style="margin:0;font-size:13px">미리보기: <b>정미주님, ${esc(GREETS[0]||'오늘도 반가워요')}</b></p>
+      <button class="btn full">저장</button></form></details>`;
 }
 
 let accessPage=false, accFil='전체';
@@ -966,6 +971,9 @@ const linkUrl=n=>LINKS[n]?`${location.origin}${location.pathname}#t=${LINKS[n]}`
 async function loadAll(){
   const [P,SC,LE,AS,RE,SG,MK]=await Promise.all(['profiles','schedules','lessons','assignments','results','school_grades','makeup_lessons'].map(t=>DB.rows(t)));
   const MM=await DB.rows('student_memos').catch(()=>[]);
+  const ST=await DB.rows('app_settings').catch(()=>[]);
+  {const g=(ST.find(r=>r.key==='greeting')?.value||'').split('\n').map(x=>x.trim()).filter(Boolean);GREETS=g.length?g:['오늘도 반가워요'];
+   if(!GREETS.includes(GREET))GREET=GREETS[Math.floor(Math.random()*GREETS.length)]}
   const AL=role==='teacher'?await (DB.since?DB.since('access_log','at',add(TODAY,-60)):DB.rows('access_log')).catch(()=>[]):[];
   ALL_ACCESS=AL.map(r=>({sid:N(r.student_id),at:localAt(r.at)||'',sa:!!r.standalone,pf:r.platform||'',inapp:!!r.inapp,act:r.action||'접속',det:r.detail||''})).sort((a,b)=>b.at.localeCompare(a.at));
   const TD=role==='teacher'?await DB.rows('teacher_todos'):[];
@@ -1135,6 +1143,8 @@ document.addEventListener('submit',async e=>{
   if(f.id==='editStuForm'){const sid=+f.dataset.sid, subjects=fd.getAll('subj');
     if(!g('name')){toast('이름을 넣어 주세요');return}if(!subjects.length){toast('과목을 하나 이상 골라 주세요');return}
     await save(()=>DB.update('profiles',{name:g('name'),school:g('school'),grade:g('grade'),subjects},{id:U(sid)}),'학생 정보를 고쳤어요');return}
+  if(f.id==='greetForm'){const v=g('g').split('\n').map(x=>x.trim()).filter(Boolean).slice(0,30);if(v.some(x=>x.length>60)){toast('한 줄은 60자 이내로 써 주세요');return}
+    GREET=v[0]||'오늘도 반가워요';await save(()=>DB.upsert('app_settings',[{key:'greeting',value:v.join('\n'),updated_at:new Date().toISOString()}],'key'),'인사말을 저장했어요');return}
   if(f.id==='memoForm'){const t=g('text').trim();if(!t){toast('내용을 써 주세요');return}
     await save(()=>DB.insert('student_memos',{student_id:U(+f.dataset.sid),category:g('cat'),text:t}),'메모를 남겼어요');return}
   if(f.id==='memoEditForm'){const t=g('text').trim();if(!t){toast('내용을 써 주세요');return}
