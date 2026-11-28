@@ -483,6 +483,10 @@ function borine(){
       ${a.correct!=null?`<div class="muted" style="font-size:12px;margin-top:2px">틀린 문항 ${a.total-a.correct}개</div>`:''}</div>`}).join('')}</section>`:''}`;
 }
 
+// 반영비율로 합산 (점수는 모두 100점 만점 기준). 비율이 있는데 점수가 빠지면 계산 안 함
+const totalOf=r=>{const p=[[r.mid,r.w_mid],[r.fin,r.w_fin],[r.perf,r.w_perf]];if(p.every(([,w])=>w==null))return null;
+  if(p.some(([v,w])=>w>0&&v==null))return null;return Math.round(p.reduce((a,[v,w])=>a+(w?v*w/100:0),0)*10)/10};
+const wTxt=r=>[r.w_mid,r.w_fin,r.w_perf].some(x=>x!=null)?`중간 ${r.w_mid??0}% · 기말 ${r.w_fin??0}% · 수행 ${r.w_perf??0}%`:'';
 function school(){
   if(!TERMS.length) return `<section class="card"><div class="empty">아직 학교 성적이 없어요. 아래에서 직접 입력해 보세요.</div></section>${mySchoolInput()}`;
   const avgOf=r=>{const v=[r.mid,r.fin].filter(x=>x!=null);return v.length?Math.round(v.reduce((a,b)=>a+b,0)/v.length*10)/10:null};
@@ -495,12 +499,14 @@ function school(){
   const card=r=>{const me=avgOf(r), d=me!=null&&r.avg!=null?me-r.avg:null, p=pctOf(r);
     return `<section class="card"><div class="rowtop"><h2 style="margin:0">${sTag(r.subj)} ${term}${r.byStu?' <i class="b ex">내가 입력 · 확인 전</i>':''}</h2>
       <span class="lv${r.lv?'':' none'}">${r.lv?esc(r.lv)+(/^\d$/.test(r.lv)?'등급':''):'등급 미정'}</span></div>
-      <div class="stats" style="margin-top:12px"><div class="stat"><b>${r.mid??'–'}</b><span>중간고사</span></div><div class="stat"><b>${r.fin??'–'}</b><span>기말고사</span></div><div class="stat"><b>${me??'–'}</b><span>내 평균</span></div></div>
-      ${r.avg!=null&&me!=null?`<div class="cmp" style="grid-template-columns:64px 1fr 48px;margin-top:12px"><span>내 평균</span><div class="b" style="width:${me}%;background:${col(r.subj)}"></div><span class="v">${me}</span>
+      <div class="stats" style="margin-top:12px;grid-template-columns:repeat(4,minmax(0,1fr))"><div class="stat"><b>${r.mid??'–'}</b><span>중간고사</span></div><div class="stat"><b>${r.fin??'–'}</b><span>기말고사</span></div><div class="stat"><b>${r.perf??'–'}</b><span>수행평가</span></div><div class="stat"><b>${me??'–'}</b><span>지필 평균</span></div></div>
+      ${r.avg!=null&&me!=null?`<div class="cmp" style="grid-template-columns:64px 1fr 48px;margin-top:12px"><span>지필 평균</span><div class="b" style="width:${me}%;background:${col(r.subj)}"></div><span class="v">${me}</span>
         <span>학교 평균</span><div class="b" style="width:${r.avg}%"></div><span class="v">${r.avg}</span></div>
         <p class="muted" style="margin:6px 0 0">학교 평균보다 <b style="color:var(--ink)">${Math.abs(d).toFixed(1)}점 ${d>=0?'높아요':'낮아요'}</b></p>`:''}
+      ${wTxt(r)?`<div class="row" style="border:0;padding-bottom:0"><span>반영비율</span><b style="font-weight:600">${wTxt(r)}</b></div>
+      <div class="row" style="border:0;padding-bottom:0"><span>합산 점수</span><b>${totalOf(r)??'<span class="muted" style="font-weight:400">점수가 다 들어오면 계산돼요</span>'}</b></div>`:''}
       <div class="row" style="border:0;padding-bottom:0"><span>석차</span><b>${r.rank&&r.n?`${r.rank} / ${r.n}명 <span class="muted">(상위 ${p}%)</span>`:r.n?`– / ${r.n}명`:'–'}</b></div>
-      ${r.mid==null||r.fin==null?'<p class="muted" style="margin:4px 0 0">아직 안 본 시험이 있어요. 평균은 입력된 시험만으로 계산했어요.</p>':''}</section>`};
+      ${r.mid==null||r.fin==null?'<p class="muted" style="margin:4px 0 0">아직 안 본 지필고사가 있어요. 지필 평균은 입력된 시험만으로 계산했어요.</p>':''}</section>`};
   const analysis=subs.map(s=>{const rs=TERMS.map(t=>SCHOOL.find(x=>x.term===t&&x.subj===s)).filter(Boolean);
     if(rs.length<2)return `<li>${sTag(s)} 비교할 학기가 아직 하나뿐이에요.</li>`;
     const [a,b]=rs.slice(-2), ma=avgOf(a), mb=avgOf(b), out=[];
@@ -689,8 +695,14 @@ function tGrade(a){
 
 function schoolFields(defTerm){return `<label>학기<select name="term">${TERM_ORDER.map(t=>`<option${t===defTerm?' selected':''}>${t}</option>`).join('')}</select></label>
     <label>과목<select name="subj"><option>영어</option><option>수학</option></select></label>
-    <label>중간고사<input name="mid" type="number" min="0" max="100" step="0.1"></label>
-    <label>기말고사<input name="fin" type="number" min="0" max="100" step="0.1"></label>
+    <div class="full" style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px"><span class="muted" style="grid-column:1/-1;font-size:13px">점수 (모두 100점 만점)</span>
+      <label>중간고사<input name="mid" type="number" min="0" max="100" step="0.1"></label>
+      <label>기말고사<input name="fin" type="number" min="0" max="100" step="0.1"></label>
+      <label>수행평가<input name="perf" type="number" min="0" max="100" step="0.1"></label></div>
+    <div class="full" style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px"><span class="muted" style="grid-column:1/-1;font-size:13px">반영비율 (%) · 합이 100이 되게</span>
+      <label>중간<input name="w_mid" type="number" min="0" max="100" step="1" placeholder="30"></label>
+      <label>기말<input name="w_fin" type="number" min="0" max="100" step="1" placeholder="30"></label>
+      <label>수행<input name="w_perf" type="number" min="0" max="100" step="1" placeholder="40"></label></div>
     <label>과목 학교 평균<input name="avg" type="number" min="0" max="100" step="0.1"></label>
     <label>등급 / 성취도<input name="lv" maxlength="3" placeholder="A 또는 2"></label>
     <label>석차<input name="rank" type="number" min="1" placeholder="21"></label>
@@ -705,7 +717,7 @@ function mySchoolInput(){
       <button class="btn full">저장</button></fieldset></form>
     <p class="muted" style="margin:8px 0 0">시험지·성적표를 보고 정확히 넣어 주세요. 선생님이 확인하면 '확인됨'으로 바뀌고, 그다음엔 선생님만 고칠 수 있어요.</p>
     ${mine.length?`<div style="margin-top:10px">${mine.map(r=>`<div class="srow"><button class="glink" style="flex:1;text-align:left;white-space:normal" data-editmyschool="${r.term}|${r.subj}">
-      <b>${r.term}</b> ${sTag(r.subj)} <span class="muted">중간 ${v(r.mid)} · 기말 ${v(r.fin)} · 평균 ${v(r.avg)} · 등급 ${esc(r.lv)||'–'}</span></button>
+      <b>${r.term}</b> ${sTag(r.subj)} <span class="muted">중간 ${v(r.mid)} · 기말 ${v(r.fin)} · 수행 ${v(r.perf)}${totalOf(r)!=null?` · 합산 ${totalOf(r)}`:''} · 평균 ${v(r.avg)} · 등급 ${esc(r.lv)||'–'}</span></button>
       <button class="btn sm danger" data-delmyschool="${r.term}|${r.subj}" aria-label="삭제">${armed==='ms'+r.term+r.subj?'정말?':'×'}</button></div>`).join('')}</div>`:''}</details>`;
 }
 function tSchool(){
@@ -719,7 +731,7 @@ function tSchool(){
     <p class="muted" style="margin:8px 0 0">빈칸은 비워 둬도 돼요. 중학교는 석차 없이 성취도(A~E)만, 고등학교는 석차등급과 석차를 넣으면 돼요.</p></section>
   <section class="card"><h2>${esc(stu(schoolSid)?.name||'')} 기록 <small>줄을 누르면 수정</small></h2>
     ${rows.length?rows.map(r=>`<div class="srow"><button class="glink" style="flex:1;text-align:left;white-space:normal" data-editschool="${r.term}|${r.subj}">
-      <b>${r.term}</b> ${sTag(r.subj)}${r.byStu?' <i class="b ex">학생 입력</i>':''} <span class="muted">중간 ${v(r.mid)||'–'} · 기말 ${v(r.fin)||'–'} · 학교평균 ${v(r.avg)||'–'} · 등급 ${esc(r.lv)||'–'} · 석차 ${r.rank?r.rank+'/'+(r.n||'?'):'–'}</span></button>
+      <b>${r.term}</b> ${sTag(r.subj)}${r.byStu?' <i class="b ex">학생 입력</i>':''} <span class="muted">중간 ${v(r.mid)||'–'} · 기말 ${v(r.fin)||'–'} · 수행 ${v(r.perf)||'–'}${wTxt(r)?` (${r.w_mid??0}/${r.w_fin??0}/${r.w_perf??0}%) · 합산 ${totalOf(r)??'–'}`:''} · 학교평균 ${v(r.avg)||'–'} · 등급 ${esc(r.lv)||'–'} · 석차 ${r.rank?r.rank+'/'+(r.n||'?'):'–'}</span></button>
       ${r.byStu?`<button class="btn sm" data-okschool="${r.sid}|${r.term}|${r.subj}">확인</button>`:''}<button class="btn sm danger" data-delschool="${r.sid}|${r.term}|${r.subj}" aria-label="삭제">×</button></div>`).join(''):'<div class="empty">아직 기록이 없어요.</div>'}
     <button class="more" data-preview="${schoolSid}" data-pg="school">이 학생 화면에서 보기</button></section>`;
 }
@@ -925,7 +937,7 @@ async function loadAll(){
   ASSIGN.length=0;AS.forEach(r=>ASSIGN.push({id:r.id,subj:r.subject,type:r.type,title:r.title,unit:r.unit||'',given:r.given,due:r.due,total:r.total,max:nn(r.max),nat:nn(r.nat),gn:nn(r.gn)}));
   for(const k in RESULTS)delete RESULTS[k];ASSIGN.forEach(a=>RESULTS[a.id]={});
   RE.forEach(r=>{(RESULTS[r.assignment_id]??={})[N(r.student_id)]={status:r.status,doneAt:localAt(r.done_at),correct:r.correct,score:nn(r.score)}});
-  ALL_SCHOOL.length=0;SG.forEach(r=>ALL_SCHOOL.push({sid:N(r.student_id),term:r.term,subj:r.subject,mid:nn(r.mid),fin:nn(r.fin),avg:nn(r.avg),lv:r.lv||'',rank:r.rank,n:r.n,byStu:!!r.by_student}));
+  ALL_SCHOOL.length=0;SG.forEach(r=>ALL_SCHOOL.push({sid:N(r.student_id),term:r.term,subj:r.subject,mid:nn(r.mid),fin:nn(r.fin),perf:nn(r.perf),w_mid:nn(r.w_mid),w_fin:nn(r.w_fin),w_perf:nn(r.w_perf),avg:nn(r.avg),lv:r.lv||'',rank:r.rank,n:r.n,byStu:!!r.by_student}));
   TODOS=TD.map(r=>({id:r.id,sid:N(r.student_id),date:r.lesson_date,subj:r.subject,text:r.text,due:r.due,done:r.done,doneAt:localAt(r.done_at)}));
   if(!stu(schoolSid))schoolSid=STUDENTS[0]?.id??null;
 }
@@ -1140,17 +1152,19 @@ document.addEventListener('submit',async e=>{
       await Promise.all(ups.map(u=>DB.update('results',{status:'graded',correct:u.correct,score:u.score},{assignment_id:a.id,student_id:U(u.sid)})));
     },`${ups.length}명 채점을 저장했어요`);return}
   if(f.id==='mySchoolForm'){if(preview){toast('미리보기에서는 입력할 수 없어요');return}
-    const rec={mid:num(g('mid')),fin:num(g('fin')),avg:num(g('avg')),lv:g('lv').toUpperCase(),rank:num(g('rank')),n:num(g('n'))};
-    if(rec.mid==null&&rec.fin==null){toast('중간이나 기말 점수를 넣어 주세요');return}
-    if([rec.mid,rec.fin,rec.avg].some(x=>x!=null&&(x<0||x>100))){toast('점수는 0~100으로 넣어 주세요');return}
+    const rec={mid:num(g('mid')),fin:num(g('fin')),perf:num(g('perf')),w_mid:num(g('w_mid')),w_fin:num(g('w_fin')),w_perf:num(g('w_perf')),avg:num(g('avg')),lv:g('lv').toUpperCase(),rank:num(g('rank')),n:num(g('n'))};
+    if(rec.mid==null&&rec.fin==null&&rec.perf==null){toast('중간·기말·수행평가 중 하나는 넣어 주세요');return}
+    if([rec.mid,rec.fin,rec.perf,rec.avg].some(x=>x!=null&&(x<0||x>100))){toast('점수는 0~100으로 넣어 주세요');return}
     if(rec.rank!=null&&rec.n!=null&&rec.rank>rec.n){toast('석차가 수강자 수보다 커요');return}
+    {const ws=[rec.w_mid,rec.w_fin,rec.w_perf];if(ws.some(x=>x!=null)&&ws.reduce((a,b)=>a+(b||0),0)!==100){toast('반영비율 합이 100이 되게 넣어 주세요');return}}
     const ex=SCHOOL.find(x=>x.term===g('term')&&x.subj===g('subj'));
     if(ex&&!ex.byStu){toast('선생님이 확인한 성적은 선생님만 고칠 수 있어요');return}
     term=g('term');await save(()=>DB.upsert('school_grades',[{student_id:U(curSid),term:g('term'),subject:g('subj'),...rec,by_student:true}],'student_id,term,subject'),'학교 성적을 저장했어요');return}
   if(f.id==='schoolForm'){if(!schoolSid){toast('먼저 학생을 등록해 주세요');return}
-    const rec={mid:num(g('mid')),fin:num(g('fin')),avg:num(g('avg')),lv:g('lv').toUpperCase(),rank:num(g('rank')),n:num(g('n'))};
-    if(rec.mid==null&&rec.fin==null){toast('중간이나 기말 점수를 넣어 주세요');return}
+    const rec={mid:num(g('mid')),fin:num(g('fin')),perf:num(g('perf')),w_mid:num(g('w_mid')),w_fin:num(g('w_fin')),w_perf:num(g('w_perf')),avg:num(g('avg')),lv:g('lv').toUpperCase(),rank:num(g('rank')),n:num(g('n'))};
+    if(rec.mid==null&&rec.fin==null&&rec.perf==null){toast('중간·기말·수행평가 중 하나는 넣어 주세요');return}
     if(rec.rank!=null&&rec.n!=null&&rec.rank>rec.n){toast('석차가 수강자 수보다 커요');return}
+    {const ws=[rec.w_mid,rec.w_fin,rec.w_perf];if(ws.some(x=>x!=null)&&ws.reduce((a,b)=>a+(b||0),0)!==100){toast('반영비율 합이 100이 되게 넣어 주세요');return}}
     await save(()=>DB.upsert('school_grades',[{student_id:U(schoolSid),term:g('term'),subject:g('subj'),...rec,by_student:false}],'student_id,term,subject'),'학교 성적을 저장했어요');return}
   }finally{if(btn&&document.body.contains(btn))btn.disabled=false}
 });
@@ -1229,10 +1243,10 @@ document.addEventListener('click',async e=>{
     render();window.scrollTo(0,0);return}
   if(d.delhw){const k='h'+d.delhw;if(armed!==k){armed=k;render();return}armed=null;editHw=null;await save(()=>DB.remove('assignments',{id:+d.delhw}),'과제를 삭제했어요');return}
   if(d.editschool){const[t,sj]=d.editschool.split('|'),r=ALL_SCHOOL.find(x=>x.sid===schoolSid&&x.term===t&&x.subj===sj),f=document.getElementById('schoolForm');
-    if(r&&f){f.elements.term.value=t;f.elements.subj.value=sj;['mid','fin','avg','lv','rank','n'].forEach(k=>f.elements[k].value=r[k]??'');f.scrollIntoView({block:'start'});toast(`${t} ${sj} 수정 중`)}return}
+    if(r&&f){f.elements.term.value=t;f.elements.subj.value=sj;['mid','fin','perf','w_mid','w_fin','w_perf','avg','lv','rank','n'].forEach(k=>f.elements[k].value=r[k]??'');f.scrollIntoView({block:'start'});toast(`${t} ${sj} 수정 중`)}return}
   if(d.okschool){const[sid,t,sj]=d.okschool.split('|');await save(()=>DB.update('school_grades',{by_student:false},{student_id:U(+sid),term:t,subject:sj}),'확인했어요. 이제 학생은 이 성적을 고칠 수 없어요');return}
   if(d.editmyschool){const[t,sj]=d.editmyschool.split('|'),r=SCHOOL.find(x=>x.term===t&&x.subj===sj),f=document.getElementById('mySchoolForm');
-    if(r&&f){f.elements.term.value=t;f.elements.subj.value=sj;['mid','fin','avg','lv','rank','n'].forEach(k=>f.elements[k].value=r[k]??'');f.scrollIntoView({block:'start'});toast(`${t} ${sj} 수정 중`)}return}
+    if(r&&f){f.elements.term.value=t;f.elements.subj.value=sj;['mid','fin','perf','w_mid','w_fin','w_perf','avg','lv','rank','n'].forEach(k=>f.elements[k].value=r[k]??'');f.scrollIntoView({block:'start'});toast(`${t} ${sj} 수정 중`)}return}
   if(d.delmyschool&&preview){toast('미리보기에서는 지울 수 없어요');return}
   if(d.delmyschool){const k='ms'+d.delmyschool.replace('|','');if(armed!==k){armed=k;render();return}armed=null;const[t,sj]=d.delmyschool.split('|');
     await save(()=>DB.remove('school_grades',{student_id:U(curSid),term:t,subject:sj}),'지웠어요');return}
