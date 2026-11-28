@@ -299,7 +299,7 @@ function logAccess(action='접속',detail=''){if(role!=='student'||preview)retur
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')logAccess()});
 const agoTxt=at=>{if(!at)return '';const m=Math.round((Date.now()-new Date(at.replace(' ','T')))/60000);return m<1?'방금':m<60?m+'분 전':m<1440?Math.round(m/60)+'시간 전':Math.round(m/1440)+'일 전'};
 const howTxt=x=>x.sa?'홈 화면 앱':x.inapp?'메신저 안 브라우저':'브라우저';
-const actTxt=x=>x.act==='접속'?`<span class="muted">앱 열기 · ${howTxt(x)}${x.pf?' · '+esc(x.pf):''}</span>`:x.act==='화면'?`<span class="muted">${esc(x.det)} 화면 봄</span>`:`<b>${esc(x.act)}</b> <span class="muted">${esc(x.det)}</span>`;
+const actTxt=x=>x.act==='접속'&&x.det?`<span class="muted">접속 (이전 로그인 기록${x.pf?' · '+esc(x.pf):''}${x.inapp?' · 메신저 안':''})</span>`:x.act==='접속'?`<span class="muted">앱 열기 · ${howTxt(x)}${x.pf?' · '+esc(x.pf):''}</span>`:x.act==='화면'?`<span class="muted">${esc(x.det)} 화면 봄</span>`:`<b>${esc(x.act)}</b> <span class="muted">${esc(x.det)}</span>`;
 function accessCard(sid){const all=ALL_ACCESS.filter(x=>x.sid===sid), xs=all, last=all[0], app=all.find(x=>x.sa);
   return `<section class="card private"><h2>🔒 접속 기록 <small>선생님만 · 최근 60일</small></h2>
     ${xs.length?`<div class="row"><span>최근 접속</span><b>${last.at.slice(5).replace('-','/')} <span class="muted" style="font-weight:400">(${agoTxt(last.at)})</span></b></div>
