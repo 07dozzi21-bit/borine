@@ -484,7 +484,7 @@ function borine(){
 }
 
 function school(){
-  if(!TERMS.length) return `<section class="card"><div class="empty">아직 학교 성적이 없어요.${preview?'':' 아래에서 직접 입력해 보세요.'}</div></section>${mySchoolInput()}`;
+  if(!TERMS.length) return `<section class="card"><div class="empty">아직 학교 성적이 없어요. 아래에서 직접 입력해 보세요.</div></section>${mySchoolInput()}`;
   const avgOf=r=>{const v=[r.mid,r.fin].filter(x=>x!=null);return v.length?Math.round(v.reduce((a,b)=>a+b,0)/v.length*10)/10:null};
   const pctOf=r=>r.rank&&r.n?Math.round(r.rank/r.n*1000)/10:null;
   const rows=SCHOOL.filter(r=>r.term===term), subs=['영어','수학'].filter(s=>SCHOOL.some(r=>r.subj===s));
@@ -697,12 +697,12 @@ function schoolFields(defTerm){return `<label>학기<select name="term">${TERM_O
     <label>수강자 수<input name="n" type="number" min="1" placeholder="212"></label>`}
 // 학생이 직접 입력하는 학교 성적 (선생님이 확인하기 전까지 '학생 입력'으로 표시)
 function mySchoolInput(){
-  if(preview)return '';
   const mine=SCHOOL.filter(r=>r.byStu).sort((a,b)=>TERM_ORDER.indexOf(a.term)-TERM_ORDER.indexOf(b.term));
   const v=x=>x??'–';
-  return `<details class="card"${!TERMS.length?' open':''}><summary><b>내 학교 성적 입력하기</b></summary>
-    <form id="mySchoolForm" class="form" style="margin-top:12px">${schoolFields(SCHOOL.at(-1)?.term||(()=>{const g=ME.grade||'';const i=TERM_ORDER.findIndex(t=>t.startsWith(g));return i<0?'중1-1':TERM_ORDER[i]})())}
-      <button class="btn full">저장</button></form>
+  return `<details class="card"${!TERMS.length||preview?' open':''}><summary><b>내 학교 성적 입력하기</b></summary>
+    ${preview?'<p class="muted" style="margin:10px 0 0;font-weight:700">미리보기라 입력은 막혀 있어요. 학생 앱에서는 여기서 직접 넣을 수 있어요.</p>':''}
+    <form id="mySchoolForm" class="form" style="margin-top:12px"><fieldset style="display:contents"${preview?' disabled':''}>${schoolFields(SCHOOL.at(-1)?.term||(()=>{const g=ME.grade||'';const i=TERM_ORDER.findIndex(t=>t.startsWith(g));return i<0?'중1-1':TERM_ORDER[i]})())}
+      <button class="btn full">저장</button></fieldset></form>
     <p class="muted" style="margin:8px 0 0">시험지·성적표를 보고 정확히 넣어 주세요. 선생님이 확인하면 '확인됨'으로 바뀌고, 그다음엔 선생님만 고칠 수 있어요.</p>
     ${mine.length?`<div style="margin-top:10px">${mine.map(r=>`<div class="srow"><button class="glink" style="flex:1;text-align:left;white-space:normal" data-editmyschool="${r.term}|${r.subj}">
       <b>${r.term}</b> ${sTag(r.subj)} <span class="muted">중간 ${v(r.mid)} · 기말 ${v(r.fin)} · 평균 ${v(r.avg)} · 등급 ${esc(r.lv)||'–'}</span></button>
@@ -1139,7 +1139,7 @@ document.addEventListener('submit',async e=>{
       if(a.type==='단원평가')await DB.update('assignments',{nat:num(g('nat')),gn:num(g('gn'))},{id:a.id});
       await Promise.all(ups.map(u=>DB.update('results',{status:'graded',correct:u.correct,score:u.score},{assignment_id:a.id,student_id:U(u.sid)})));
     },`${ups.length}명 채점을 저장했어요`);return}
-  if(f.id==='mySchoolForm'){
+  if(f.id==='mySchoolForm'){if(preview){toast('미리보기에서는 입력할 수 없어요');return}
     const rec={mid:num(g('mid')),fin:num(g('fin')),avg:num(g('avg')),lv:g('lv').toUpperCase(),rank:num(g('rank')),n:num(g('n'))};
     if(rec.mid==null&&rec.fin==null){toast('중간이나 기말 점수를 넣어 주세요');return}
     if([rec.mid,rec.fin,rec.avg].some(x=>x!=null&&(x<0||x>100))){toast('점수는 0~100으로 넣어 주세요');return}
@@ -1233,6 +1233,7 @@ document.addEventListener('click',async e=>{
   if(d.okschool){const[sid,t,sj]=d.okschool.split('|');await save(()=>DB.update('school_grades',{by_student:false},{student_id:U(+sid),term:t,subject:sj}),'확인했어요. 이제 학생은 이 성적을 고칠 수 없어요');return}
   if(d.editmyschool){const[t,sj]=d.editmyschool.split('|'),r=SCHOOL.find(x=>x.term===t&&x.subj===sj),f=document.getElementById('mySchoolForm');
     if(r&&f){f.elements.term.value=t;f.elements.subj.value=sj;['mid','fin','avg','lv','rank','n'].forEach(k=>f.elements[k].value=r[k]??'');f.scrollIntoView({block:'start'});toast(`${t} ${sj} 수정 중`)}return}
+  if(d.delmyschool&&preview){toast('미리보기에서는 지울 수 없어요');return}
   if(d.delmyschool){const k='ms'+d.delmyschool.replace('|','');if(armed!==k){armed=k;render();return}armed=null;const[t,sj]=d.delmyschool.split('|');
     await save(()=>DB.remove('school_grades',{student_id:U(curSid),term:t,subject:sj}),'지웠어요');return}
   if(d.delschool){const[sid,t,s]=d.delschool.split('|');await save(()=>DB.remove('school_grades',{student_id:U(+sid),term:t,subject:s}));return}
