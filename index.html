@@ -359,7 +359,8 @@ function home(){
     ${todo.length?todo.slice(0,4).map(a=>item(a)).join(''):'<div class="empty">남은 과제가 없어요.</div>'}
     <button class="more" data-go="homework">과제 캘린더 보기</button></section>
   ${lastFb?`<section class="card"><h2>최근 수업 피드백 <small>${mdw(lastFb.date)} ${lastFb.subj}</small></h2>
-    <div class="fb" style="margin-top:0"><p><span class="k">잘한 점</span>${esc(lastFb.good)}</p><p><span class="k">보완할 점</span>${esc(lastFb.next)}</p></div></section>`:''}`;
+    <div class="fb" style="margin-top:0"><p><span class="k">잘한 점</span>${esc(lastFb.good)}</p><p><span class="k">보완할 점</span>${esc(lastFb.next)}</p></div></section>`:''}
+  ${rulesCard()}`;
 }
 
 function lesson(){
@@ -529,7 +530,7 @@ function my(){
     <div class="row"><span>담당</span><b>${esc(ME.teacher)}</b></div>
     <div class="row"><span>수업</span><b>${SCHEDULE.map(s=>DOW[s.dow]+' '+s.subj).join(' · ')}</b></div>
     <div class="row"><span>비밀번호</span><b class="muted">숫자 네 자리 · 선생님이 바꿔 줘요</b></div>
-    </section>${rulesCard()}${memoCard(curSid,preview?null:'student')}<button class="more" data-logout="1" style="background:var(--card)">${preview?'선생님 화면으로 돌아가기':'로그아웃'}</button>`;
+    </section>${memoCard(curSid,preview?null:'student')}<button class="more" data-logout="1" style="background:var(--card)">${preview?'선생님 화면으로 돌아가기':'로그아웃'}</button>`;
 }
 
 // ===== 선생님 화면 =====
