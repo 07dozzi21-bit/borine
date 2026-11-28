@@ -645,7 +645,7 @@ function tStudents(){
   <section class="card"><h2>학생 목록 <small>${gradeFil==='전체'?'':gradeFil}</small></h2>    ${STUDENTS.filter(x=>gradeFil==='전체'||(gradeFil==='기타'?!GRADES.includes(x.grade):x.grade===gradeFil)).sort((a,b)=>gIdx(a.grade)-gIdx(b.grade)||a.name.localeCompare(b.name,'ko')).map(s=>{const td=TODOS.filter(t=>t.sid===s.id&&!t.done).length, nx=(()=>{for(let i=0;i<8;i++){const d=add(TODAY,i);const o=dayLessons(s.id,d).filter(x=>!(i===0&&x.time<=NOW_TIME))[0];if(o)return {d,...o}}})();
       return `<button class="lrow" data-sdetail="${s.id}"><span style="flex:1;text-align:left"><b>${esc(s.name)}</b> <span class="muted">${esc(s.grade)}</span>
       <span style="display:block;font-size:13px;color:var(--mute)">${s.subjects.join('·')}${nx?` · 다음 수업 ${mdw(nx.d)} ${nx.time} ${nx.subj}`:''}</span></span>
-      <span class="badges">${td?`<i class="b todo">할일 ${td}</i>`:''}${ALL_ACCESS.some(x=>x.sid===s.id&&x.sa)?'<i class="b ok">앱</i>':''}</span><span aria-hidden="true" style="color:var(--mute)">›</span></button>`}).join('')}</section>
+      <span class="badges">${td?`<i class="b todo">할일 ${td}</i>`:''}</span><span aria-hidden="true" style="color:var(--mute)">›</span></button>`}).join('')}</section>
   <details class="card"><summary><b>학생 등록</b></summary><div style="margin-top:12px">
     <form id="stuForm" class="form">
       <label>이름<input name="name" required></label><label>학교<input name="school"></label>
