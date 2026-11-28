@@ -103,6 +103,13 @@ th{font-size:12px;color:var(--mute);font-weight:500}.num{text-align:right;white-
 .sheet{position:fixed;left:0;right:0;bottom:0;z-index:31;background:var(--card);border-radius:20px 20px 0 0;padding:10px 18px calc(18px + env(safe-area-inset-bottom));max-height:85vh;overflow:auto;box-shadow:0 -8px 24px rgba(0,0,0,.15)}
 .sheet .grab{width:40px;height:5px;border-radius:3px;background:var(--line);margin:0 auto 12px}
 @media(prefers-reduced-motion:no-preference){.sheet{animation:up .2s ease-out}@keyframes up{from{transform:translateY(40px);opacity:.4}}}
+.splash{min-height:calc(100vh - 140px);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px 8px}
+.splash img{border-radius:16px}
+.splash .motto{font-size:26px;font-weight:900;color:var(--priv);margin:18px 0 20px;letter-spacing:-.5px}
+.splash .rule{max-width:340px;text-align:left;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px}
+.rule{display:flex;gap:12px;align-items:flex-start;padding:8px 0}.rule .no{flex:none;width:30px;height:30px;border-radius:50%;background:var(--priv);color:var(--card);font-weight:800;display:flex;align-items:center;justify-content:center}
+.rule b{display:block;line-height:1.35}.rule p{margin:3px 0 0;font-size:14px;line-height:1.5;color:var(--mute)}
+.motto-s{margin:0 0 6px;padding:10px 14px;border-radius:12px;background:color-mix(in srgb,var(--priv) 10%,transparent);color:var(--priv);font-weight:800}
 .wk-today{border-color:var(--deep)}
 .memo{padding:10px 0;border-bottom:1px solid var(--line)}.memo .top{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .memo .mt{white-space:pre-wrap;word-break:break-word;margin-top:6px;font-size:15px;line-height:1.5}
@@ -522,7 +529,7 @@ function my(){
     <div class="row"><span>담당</span><b>${esc(ME.teacher)}</b></div>
     <div class="row"><span>수업</span><b>${SCHEDULE.map(s=>DOW[s.dow]+' '+s.subj).join(' · ')}</b></div>
     <div class="row"><span>비밀번호</span><b class="muted">숫자 네 자리 · 선생님이 바꿔 줘요</b></div>
-    </section>${memoCard(curSid,preview?null:'student')}<button class="more" data-logout="1" style="background:var(--card)">${preview?'선생님 화면으로 돌아가기':'로그아웃'}</button>`;
+    </section>${rulesCard()}${memoCard(curSid,preview?null:'student')}<button class="more" data-logout="1" style="background:var(--card)">${preview?'선생님 화면으로 돌아가기':'로그아웃'}</button>`;
 }
 
 // ===== 선생님 화면 =====
@@ -924,6 +931,20 @@ function readRoute(){
   else if(h==='#teacher'){gate='teacher'}
   else{try{linkToken=localStorage.getItem(LINK_KEY)}catch(e){}gate=linkToken?'student':'none'}
 }
+const MOTTO='나는 매일 성장한다.';
+const RULES=[['나는 틀린 문제를 성장의 기회로 삼는다','틀리면 기뻐한다. 내가 모르는 것을 알게 된 기회다.'],
+  ['나는 이해한 것만 내 것으로 여긴다','모르면 "모른다"고 말하고, 아는 것은 내 말로 설명할 수 있어야 한다.'],
+  ['나는 타인이 아니라 어제의 나와 비교한다','점수의 높낮이보다, 지난주에 비해 얼마나 자랐는지를 본다.'],
+  ['나는 숙제에 일단 도전해 본다','숙제가 많은 건 쌤이 내가 해낼 수 있다고 믿기 때문이다. 해보고 벅차면 솔직하게 말하고 함께 조정한다.'],
+  ['나는 다음 걸음을 스스로 정한다','남 탓이나 핑계 대신, 다음엔 무엇을 바꿀지 찾는다.']];
+// 앱을 열 때 나오는 대기화면: 다짐 + 수칙 하나(매번 바뀜)
+function splash(){const i=Math.floor(Math.random()*RULES.length),[t,d]=RULES[i];
+  return `<div class="splash"><img src="./icon-192.png" alt="" width="64" height="64">
+    <p class="motto">${MOTTO}</p>
+    <div class="rule"><span class="no">${i+1}</span><div><b>${t}</b><p>${esc(d)}</p></div></div>
+    <p class="muted" style="font-size:13px;margin-top:22px">보리네 학생 수칙 · 불러오는 중…</p></div>`}
+function rulesCard(){return `<section class="card"><h2>보리네 학생 수칙</h2><p class="motto-s">${MOTTO}</p>
+  ${RULES.map(([t,d],i)=>`<div class="rule"><span class="no">${i+1}</span><div><b>${t}</b><p>${esc(d)}</p></div></div>`).join('')}</section>`}
 async function prepareGate(){
   loginErr='';linkBad='';
   if(gate==='teacher'){try{const r=await DB.api('status');needsSetup=!!r.needsSetup}catch(e){loginErr=e.message}}
@@ -970,8 +991,8 @@ async function enter(){
   const p=await DB.myProfile();
   if(!p){role=null;busy=false;loginErr='계정 정보를 찾지 못했어요. 선생님께 문의해 주세요.';render();return}
   role=p.role==='admin'?'teacher':'student';MYUID=p.id;
-  view.innerHTML='<div class="empty" style="padding-top:30vh">불러오는 중…</div>';bar.hidden=true;
-  try{await loadAll()}catch(e){view.innerHTML=`<section class="card" style="margin-top:20vh"><b>불러오지 못했어요</b><p class="muted">${esc(e.message)}</p><button class="btn" data-logout="1">처음으로</button></section>`;busy=false;return}
+  view.innerHTML=splash();bar.hidden=true;const t0=Date.now();
+  try{await loadAll();if(role==='student'){const w=1600-(Date.now()-t0);if(w>0)await new Promise(r=>setTimeout(r,w))}}catch(e){view.innerHTML=`<section class="card" style="margin-top:20vh"><b>불러오지 못했어요</b><p class="muted">${esc(e.message)}</p><button class="btn" data-logout="1">처음으로</button></section>`;busy=false;return}
   if(role==='student'){curSid=N(p.id);load(curSid);tab='home'}else{ttab='today'}
   busy=false;render();window.scrollTo(0,0);
 }
@@ -1226,7 +1247,7 @@ document.addEventListener('touchmove',e=>{if(e.touches&&e.touches.length>1)e.pre
 if('serviceWorker' in navigator)navigator.serviceWorker.register('./sw.js',{updateViaCache:'none'}).then(r=>r.update()).catch(()=>{});
 addEventListener('hashchange',()=>location.reload());
 (async()=>{
-  view.innerHTML='<div class="empty" style="padding-top:30vh">불러오는 중…</div>';bar.hidden=true;
+  view.innerHTML=splash();bar.hidden=true;
   readRoute();
   try{await DB.init()}catch(e){view.innerHTML=`<section class="card" style="margin-top:20vh"><b>연결 오류</b><p class="muted">${esc(e.message)}</p></section>`;return}
   let p=null;try{p=await DB.myProfile()}catch(e){}
