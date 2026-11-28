@@ -691,7 +691,10 @@ function tGrade(a){
         <td class="num" id="r_${sid}"${rt!=null&&rt<=50?' style="color:var(--bad);font-weight:700"':''}>${rt!=null?rt+'%':'-'}</td></tr>`}).join('')}
     </tbody></table></div>
     <p class="muted">${unit?'':'맞은 수와 점수 중 하나만 넣어도 돼요. '}빈칸은 채점하지 않은 걸로 둬요. 정답률 50% 이하는 학생 화면 "보충 필요 항목"에 자동으로 떠요.</p>
-    <button class="btn" style="width:100%">채점 저장</button></section></form>`;
+    <button class="btn" style="width:100%">채점 저장</button></section></form>
+  <section class="card"><h2>채점 안 하고 정리 <small>안 해도 되는 과제일 때</small></h2>
+    <p class="muted" style="margin:0 0 10px">과제를 삭제하면 모든 학생에게서 사라지고 되돌릴 수 없어요. 한 학생만 빼려면 편집에서 "빼기"를 누르세요.</p>
+    <div class="acts"><button class="btn ghost" data-edithw="${a.id}">편집 (학생 빼기)</button><button class="btn danger" data-delhw="${a.id}">${armed==='h'+a.id?'정말 과제 삭제':'과제 삭제'}</button></div></section>`;
 }
 
 function schoolFields(defTerm){return `<label>학기<select name="term">${TERM_ORDER.map(t=>`<option${t===defTerm?' selected':''}>${t}</option>`).join('')}</select></label>
@@ -1242,7 +1245,7 @@ document.addEventListener('click',async e=>{
   if(d.ungrade){gradeId=null;gradeHl=null;const gb=gradeBack;gradeBack=null;
     if(gb?.kind==='detail'){ttab='students';stuDetail=gb.sid}else if(gb?.kind==='lesson'){lessonCtx=gb.ctx;backTo=gb.back}else if(gb?.kind==='today'){ttab='today'}
     render();window.scrollTo(0,0);return}
-  if(d.delhw){const k='h'+d.delhw;if(armed!==k){armed=k;render();return}armed=null;editHw=null;await save(()=>DB.remove('assignments',{id:+d.delhw}),'과제를 삭제했어요');return}
+  if(d.delhw){const k='h'+d.delhw;if(armed!==k){armed=k;render();return}armed=null;editHw=null;if(gradeId===+d.delhw){gradeId=null;gradeHl=null}await save(()=>DB.remove('assignments',{id:+d.delhw}),'과제를 삭제했어요');return}
   if(d.editschool){const[t,sj]=d.editschool.split('|'),r=ALL_SCHOOL.find(x=>x.sid===schoolSid&&x.term===t&&x.subj===sj),f=document.getElementById('schoolForm');
     if(r&&f){f.elements.term.value=t;f.elements.subj.value=sj;['mid','fin','perf','w_mid','w_fin','w_perf','avg','lv','rank','n'].forEach(k=>f.elements[k].value=r[k]??'');f.scrollIntoView({block:'start'});toast(`${t} ${sj} 수정 중`)}return}
   if(d.okschool){const[sid,t,sj]=d.okschool.split('|');await save(()=>DB.update('school_grades',{by_student:false},{student_id:U(+sid),term:t,subject:sj}),'확인했어요. 이제 학생은 이 성적을 고칠 수 없어요');return}
