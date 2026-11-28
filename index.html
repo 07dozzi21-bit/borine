@@ -409,8 +409,9 @@ function homework(){
       <div class="legend"><span><i style="background:var(--en)"></i>영어</span><span><i style="background:var(--ma)"></i>수학</span><span>점 = 그날 마감 과제</span></div></section>
       <section class="card"><h2>${mdw(hwDate)} 마감</h2>${list(hwDate)}</section>`;
   }
-  const late=A.filter(a=>a.status==='todo'&&a.due<TODAY).length;
-  return `<div class="head"><h1>과제</h1><div class="sub">캘린더는 마감일 기준 · 숙제평가는 다 하면 완료 체크${late?` · <b style="color:var(--bad)">기한 지난 과제 ${late}개</b>`:''}</div></div>${seg}${body}`;
+  const lateHw=A.filter(a=>a.status==='todo'&&a.type==='숙제평가'&&a.due<TODAY).sort((a,b)=>a.due.localeCompare(b.due));
+  const lateCard=lateHw.length?`<section class="card" style="border-color:var(--bad)"><h2 style="color:var(--bad)">기한 지난 숙제 <small>${lateHw.length}개 · 늦었어도 다 했으면 완료 체크!</small></h2>${lateHw.map(a=>item(a)).join('')}</section>`:'';
+  return `<div class="head"><h1>과제</h1><div class="sub">캘린더는 마감일 기준 · 숙제평가는 다 하면 완료 체크 · 기한이 지나도 체크할 수 있어요</div></div>${seg}${lateCard}${body}`;
 }
 
 function lineChart(series,labels,{min=0,max=100,unit='%'}={}){
